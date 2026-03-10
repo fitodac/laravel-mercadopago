@@ -1,0 +1,131 @@
+---
+title: "Managing Customers"
+description: "Create customers and manage their saved cards in MercadoPago"
+---
+
+MercadoPago's customer management allows you to store customer information and tokenized cards for faster checkout and recurring payments.
+
+## Why use customer management
+
+Storing customers and cards enables:
+
+- **Faster checkout**: Customers don't re-enter card details
+- **Recurring payments**: Charge saved cards for subscriptions
+- **Better UX**: Display saved payment methods
+- **PCI compliance**: Cards are tokenized and stored by MercadoPago
+
+<Note>
+  The package never stores raw card data. All card information is tokenized and stored securely by MercadoPago.
+</Note>
+
+## Creating customers
+
+```php
+<?php
+
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+final class CustomerController
+{
+    public function store(
+        Request $request,
+        CustomerService $customerService
+    ): JsonResponse {
+        $payload = $request->validate([
+            'email' => ['required', 'email'],
+            'first_name' => ['sometimes', 'string'],
+            'last_name' => ['sometimes', 'string'],
+        ]);
+
+        $customer = $customerService->create($payload);
+
+        return response()->json($customer, 201);
+    }
+}
+```
+
+## Managing customer cards
+
+### Adding cards
+
+```php
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+$card = $cardService->create($customerId, [
+    'token' => $request->input('token') // From MercadoPago.js
+]);
+```
+
+<Warning>
+  Card tokens are obtained using MercadoPago.js on the frontend. Never send raw card data to your server.
+</Warning>
+
+### Deleting cards
+
+```php
+$this->cardService->delete($customerId, $cardId);
+```
+
+## Common patterns
+
+### Creating customer on user registration
+
+```php
+$customer = $customerService->create([
+    'email' => $user->email,
+    'first_name' => $user->first_name,
+    'last_name' => $user->last_name,
+    'metadata' => ['user_id' => (string) $user->id],
+]);
+
+$user->update([
+    'mercadopago_customer_id' => data_get($customer, 'id'),
+]);
+```
+
+### Charging a saved card
+
+```php
+$payment = $paymentService->create([
+    'transaction_amount' => $request->amount,
+    'token' => $request->card_token,
+    'description' => 'Subscription renewal',
+    'installments' => 1,
+    'payment_method_id' => 'visa',
+    'payer' => [
+        'id' => $user->mercadopago_customer_id,
+        'email' => $user->email,
+    ],
+]);
+```
+
+## Best practices
+
+### Store customer IDs locally
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->string('mercadopago_customer_id')->nullable()->unique();
+});
+```
+
+### Handle customer creation idempotently
+
+```php
+if ($user->mercadopago_customer_id) {
+    return $customerService->get($user->mercadopago_customer_id);
+}
+
+$customer = $customerService->create([...]);
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Processing Payments" icon="credit-card" href="/guides/processing-payments">
+    Process payments with saved cards
+  </Card>
+  <Card title="Testing" icon="flask" href="/guides/testing">
+    Test with demo users and cards
+  </Card>
+</CardGroup>

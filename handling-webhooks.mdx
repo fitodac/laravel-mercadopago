@@ -1,0 +1,191 @@
+---
+title: "Handling Webhooks"
+description: "Receive and validate MercadoPago payment notifications securely"
+---
+
+Webhooks are HTTP POST notifications that MercadoPago sends to your server when payment events occur. They are essential for reliable payment processing.
+
+<Warning>
+  Never rely solely on redirect URLs or frontend callbacks for payment confirmation. Webhooks provide server-to-server communication that you can trust.
+</Warning>
+
+## Webhook endpoint
+
+The package automatically registers a webhook endpoint:
+
+```
+POST /api/mercadopago/webhooks
+```
+
+This route is **always active**, even when demo routes are disabled in production.
+
+## Configuration
+
+### Setting up the webhook secret
+
+```bash .env
+MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret_from_mercadopago
+```
+
+<Note>
+  Without a webhook secret, the package accepts all webhook requests but marks them as `validated: false`. Always configure the secret in production.
+</Note>
+
+### Registering your webhook URL
+
+In your MercadoPago dashboard, register:
+
+```
+https://your-domain.com/api/mercadopago/webhooks
+```
+
+Or set it per preference:
+
+```php
+$preference = $preferenceService->create([
+    'items' => [...],
+    'notification_url' => 'https://your-domain.com/api/mercadopago/webhooks',
+]);
+```
+
+## Webhook signature validation
+
+The package automatically validates webhook signatures using HMAC-SHA256:
+
+<Steps>
+  <Step title="Extract signature components">
+    Parse `x-signature` header for timestamp (`ts`) and signature hash (`v1`)
+  </Step>
+  <Step title="Build manifest">
+    Construct manifest: `id:{resource_id};request-id:{request_id};ts:{timestamp};`
+  </Step>
+  <Step title="Compute HMAC">
+    Calculate HMAC-SHA256 of manifest using webhook secret
+  </Step>
+  <Step title="Compare signatures">
+    Use timing-safe comparison to verify signatures match
+  </Step>
+</Steps>
+
+## Processing webhooks
+
+The `WebhookService` returns:
+
+```php
+[
+    'acknowledged' => true,
+    'validated' => true,
+    'topic' => 'payment',
+    'resource' => '123456789',
+    'payload' => [...]
+]
+```
+
+### Option 1: Dispatch events
+
+```php
+final class MercadoPagoWebhookController
+{
+    public function __invoke(
+        Request $request,
+        WebhookService $webhookService
+    ): JsonResponse {
+        $result = $webhookService->handle($request);
+
+        if ($result['topic'] === 'payment') {
+            event(new PaymentReceived(
+                paymentId: $result['resource'],
+                validated: $result['validated'],
+            ));
+        }
+
+        return response()->json(['ok' => true]);
+    }
+}
+```
+
+### Option 2: Queue jobs
+
+```php
+ProcessPaymentWebhook::dispatch($result['resource'])
+    ->onQueue('webhooks');
+
+return response()->json(['ok' => true]);
+```
+
+### Option 3: Direct processing
+
+```php
+if ($result['topic'] === 'payment') {
+    $payment = $paymentService->get($result['resource']);
+    
+    Order::where('reference', data_get($payment, 'external_reference'))
+        ->update(['payment_status' => data_get($payment, 'status')]);
+}
+```
+
+## Best practices
+
+### Always verify payment status
+
+```php
+// ❌ Don't do this
+$status = $result['payload']['status'];
+
+// ✅ Do this instead
+$payment = $paymentService->get($result['resource']);
+$status = data_get($payment, 'status');
+```
+
+### Respond quickly
+
+MercadoPago expects a response in under 5 seconds. Dispatch a job and return immediately.
+
+### Handle idempotency
+
+MercadoPago may send duplicate webhooks:
+
+```php
+if (WebhookLog::where('resource_id', $paymentId)->exists()) {
+    return response()->json(['ok' => true]);
+}
+```
+
+## Testing webhooks locally
+
+Use tunneling services to expose your local server:
+
+```bash
+# Using ngrok
+ngrok http 8000
+```
+
+### Manual webhook simulation
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/webhooks \
+  --header 'Content-Type: application/json' \
+  --header 'x-request-id: test-request-123' \
+  --data '{"type":"payment","data":{"id":"123456789"}}'
+```
+
+## Production checklist
+
+- ✅ `MERCADOPAGO_WEBHOOK_SECRET` configured
+- ✅ HTTPS enabled on webhook endpoint
+- ✅ Webhook URL registered in MercadoPago dashboard
+- ✅ Idempotency handling implemented
+- ✅ Quick response time (< 5s)
+- ✅ Queue system for processing
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Refunds" icon="rotate-left" href="/guides/refunds">
+    Handle payment refunds
+  </Card>
+  <Card title="Testing" icon="flask" href="/guides/testing">
+    Test webhooks locally
+  </Card>
+</CardGroup>

@@ -1,0 +1,165 @@
+---
+title: "Debugging"
+description: "Techniques and tools for debugging issues with the Laravel MercadoPago package"
+---
+
+## Health Check Endpoint
+
+The package provides a health endpoint to verify your configuration.
+
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
+
+**Successful response:**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "configured": true,
+    "has_public_key": true,
+    "has_webhook_secret": true,
+    "environment": "local"
+  },
+  "meta": []
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `configured` | Access token is set |
+| `has_public_key` | Public key is configured |
+| `has_webhook_secret` | Webhook secret is configured |
+| `environment` | Current Laravel environment |
+
+## Route Inspection
+
+```bash
+# List all package routes
+php artisan route:list --name=mercadopago
+
+# Check middleware applied
+php artisan route:list --name=mercadopago --columns=method,uri,name,middleware
+
+# Verify route prefix
+php artisan config:show mercadopago.route_prefix
+```
+
+## Log Inspection
+
+Add debug logging to your controllers:
+
+```php
+Log::channel('daily')->info('Creating MercadoPago preference', ['payload' => $payload]);
+
+try {
+    $preference = $service->create($payload);
+    Log::channel('daily')->info('Preference created', ['id' => data_get($preference, 'id')]);
+} catch (\Exception $e) {
+    Log::channel('daily')->error('Failed to create preference', ['error' => $e->getMessage()]);
+    throw $e;
+}
+```
+
+View logs:
+
+```bash
+tail -f storage/logs/laravel.log
+```
+
+## Exception Handling
+
+### Package-Specific Exceptions
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+use Fitodac\LaravelMercadoPago\Exceptions\InvalidWebhookSignatureException;
+
+try {
+    $preference = $preferenceService->create($payload);
+} catch (MercadoPagoConfigurationException $e) {
+    return response()->json(['error' => 'Payment system is not properly configured'], 500);
+}
+```
+
+### SDK Error Debugging
+
+```php
+use MercadoPago\Exceptions\MPApiException;
+
+try {
+    $payment = $paymentService->create($payload);
+} catch (MPApiException $e) {
+    Log::error('MercadoPago API error', [
+        'status_code' => $e->getStatusCode(),
+        'message' => $e->getMessage(),
+    ]);
+}
+```
+
+## Configuration Debugging
+
+```bash
+# Dump current configuration
+php artisan config:show mercadopago
+
+# Check environment variables
+php artisan tinker
+>>> config('mercadopago.access_token')
+>>> config('mercadopago.enable_demo_routes')
+>>> app()->environment()
+
+# Clear all caches
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+composer dump-autoload
+```
+
+## Network Debugging
+
+```bash
+# Test webhook connectivity with verbose output
+curl -X POST https://your-domain.com/api/mercadopago/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{"type":"payment","data":{"id":"123"}}' \
+  -v
+```
+
+### Use ngrok for Local Development
+
+```bash
+ngrok http 8000
+```
+
+ngrok provides a web interface at `http://127.0.0.1:4040` showing all webhook requests, headers, and payloads.
+
+## Testing Webhook Signatures
+
+Generate test signatures in your tests:
+
+```php
+class WebhookSignatureGenerator
+{
+    public static function generate(string $dataId, string $requestId, string $secret): array
+    {
+        $timestamp = time();
+        $manifest = sprintf('id:%s;request-id:%s;ts:%d;', $dataId, $requestId, $timestamp);
+        $hash = hash_hmac('sha256', $manifest, $secret);
+        
+        return [
+            'x-signature' => sprintf('ts=%d,v1=%s', $timestamp, $hash),
+            'x-request-id' => $requestId
+        ];
+    }
+}
+```
+
+## Getting Help
+
+1. Enable all logging to capture as much information as possible
+2. Check the health endpoint to verify basic configuration
+3. Review logs for error messages and stack traces
+4. Consult [Common Issues](/troubleshooting/common-issues)
+5. Report bugs on [GitHub](https://github.com/fitodac/laravel-mercadopago/issues) with logs and reproduction steps

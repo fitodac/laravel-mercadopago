@@ -1,0 +1,150 @@
+---
+title: "Security Best Practices"
+description: "Secure your Laravel MercadoPago integration with authentication, HTTPS, and credential management"
+---
+
+Security is critical when handling payment operations.
+
+<Warning>
+  **Never commit credentials to your repository.** All sensitive data must be stored in environment variables or secure secret management systems.
+</Warning>
+
+## Webhook Security
+
+### HMAC Signature Validation
+
+Configure your webhook secret:
+
+```bash .env
+MERCADOPAGO_WEBHOOK_SECRET=your_secret_from_mercadopago_dashboard
+```
+
+The package validates signatures using HMAC-SHA256. The validation requires:
+- `x-signature` header with format `v1=hash,ts=timestamp`
+- `x-request-id` header
+- `data.id` parameter (query string or payload)
+
+<Warning>
+  **Never disable webhook signature validation in production.**
+</Warning>
+
+### Webhook Security Best Practices
+
+1. **Always validate signatures** - Configure `MERCADOPAGO_WEBHOOK_SECRET` in production
+2. **Use HTTPS only** - Never expose webhook endpoints over HTTP
+3. **Verify resource existence** - Query MercadoPago API to confirm payment status
+4. **Implement idempotency** - Handle duplicate webhook deliveries gracefully
+5. **Log failed validations** - Monitor for potential security threats
+
+## HTTPS Requirements
+
+HTTPS is mandatory for production. MercadoPago webhooks only work with HTTPS endpoints.
+
+### Force HTTPS in Laravel
+
+```php
+public function boot(): void
+{
+    if ($this->app->environment('production')) {
+        \Illuminate\Support\Facades\URL::forceScheme('https');
+    }
+}
+```
+
+## Credential Management
+
+### Credential Rotation
+
+<Steps>
+  <Step title="Generate new credentials">
+    Create new credentials in your MercadoPago dashboard.
+  </Step>
+  <Step title="Update environment variables">
+    ```bash .env
+    MERCADOPAGO_ACCESS_TOKEN=new_access_token
+    MERCADOPAGO_WEBHOOK_SECRET=new_webhook_secret
+    ```
+  </Step>
+  <Step title="Clear configuration cache">
+    ```bash
+    php artisan config:clear
+    php artisan config:cache
+    ```
+  </Step>
+  <Step title="Revoke old credentials">
+    After verifying the new credentials work, revoke the old ones in your MercadoPago dashboard.
+  </Step>
+</Steps>
+
+## Custom Controller Security
+
+### Authentication
+
+```php
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/checkout/preferences', [CheckoutController::class, 'store']);
+});
+```
+
+### Authorization
+
+```php
+Gate::authorize('create-payment', $request->user());
+```
+
+### Rate Limiting
+
+```php
+Route::middleware(['throttle:10,1'])->group(function () {
+    Route::post('/checkout/preferences', [CheckoutController::class, 'store']);
+});
+```
+
+## Security Don'ts
+
+- ❌ Commit credentials to Git
+- ❌ Share access tokens or webhook secrets
+- ❌ Expose demo routes in production
+- ❌ Use HTTP for webhook endpoints
+- ❌ Skip webhook signature validation
+- ❌ Trust webhook data without verification
+- ❌ Store credentials in frontend code
+
+## Security Do's
+
+- ✅ Store credentials in environment variables
+- ✅ Enable HTTPS with valid certificates
+- ✅ Configure webhook secrets
+- ✅ Validate webhook signatures
+- ✅ Disable demo routes in production
+- ✅ Implement custom controllers with authentication
+- ✅ Validate all user input
+- ✅ Apply rate limiting
+- ✅ Rotate credentials periodically
+
+## Incident Response
+
+<Steps>
+  <Step title="Immediate actions">
+    1. Revoke compromised credentials in MercadoPago dashboard
+    2. Review recent payment transactions for anomalies
+    3. Check application logs for suspicious activity
+  </Step>
+  <Step title="Remediation">
+    1. Generate new credentials
+    2. Update environment variables
+    3. Deploy configuration changes
+    4. Monitor for continued suspicious activity
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Production Deployment" icon="server" href="/deployment/production">
+    Deploy your application to production
+  </Card>
+  <Card title="Webhook Handling" icon="bell" href="/guides/handling-webhooks">
+    Process webhook notifications securely
+  </Card>
+</CardGroup>

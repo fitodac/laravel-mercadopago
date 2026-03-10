@@ -1,0 +1,263 @@
+---
+title: "Configuration"
+description: "Configure Laravel MercadoPago with environment variables, publish the config file, and understand all available configuration options."
+---
+
+## Publishing the Configuration
+
+While the package works with environment variables alone, you can optionally publish the configuration file for advanced customization.
+
+```bash
+php artisan vendor:publish --tag=mercadopago-config
+```
+
+This creates `config/mercadopago.php` in your Laravel application.
+
+## Environment Variables
+
+All configuration options can be set via environment variables in your `.env` file.
+
+### Required Configuration
+
+<ParamField path="MERCADOPAGO_ACCESS_TOKEN" type="string" required>
+  Your Mercado Pago access token. This is used by the SDK to authenticate API requests.
+
+  **Where to find it**: Mercado Pago Dashboard → Your integrations → Credentials
+
+  ```bash .env
+  MERCADOPAGO_ACCESS_TOKEN=APP_USR-1234567890123456-123456-abc123def456ghi789jkl012mno345-123456789
+  ```
+
+  Without a valid `MERCADOPAGO_ACCESS_TOKEN`, the package services will throw a configuration exception when attempting to make API calls.
+</ParamField>
+
+### Optional Configuration
+
+<ParamField path="MERCADOPAGO_PUBLIC_KEY" type="string">
+  Your Mercado Pago public key. Used for frontend integrations like card tokenization.
+
+  ```bash .env
+  MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+  ```
+</ParamField>
+
+<ParamField path="MERCADOPAGO_WEBHOOK_SECRET" type="string">
+  Secret used to validate webhook HMAC signatures. **Highly recommended for production**.
+
+  ```bash .env
+  MERCADOPAGO_WEBHOOK_SECRET=your-webhook-secret-from-mercadopago
+  ```
+
+  If not configured, webhooks will be accepted without signature validation (`validated: false` in the response).
+</ParamField>
+
+<ParamField path="MERCADOPAGO_ROUTE_PREFIX" type="string" default="api/mercadopago">
+  Prefix for all registered routes (webhook and demo endpoints).
+
+  ```bash .env
+  MERCADOPAGO_ROUTE_PREFIX=api/payments
+  ```
+</ParamField>
+
+<ParamField path="MERCADOPAGO_ENABLE_DEMO_ROUTES" type="boolean" default="true">
+  Enable or disable demo routes. Demo routes are always disabled in production regardless of this setting.
+
+  ```bash .env
+  MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+  ```
+</ParamField>
+
+<ParamField path="MERCADOPAGO_RUNTIME_ENVIRONMENT" type="string">
+  Forces the Mercado Pago SDK runtime environment. If not set, the package automatically uses `local` when `APP_ENV` is `local` or `testing`, and `server` in all other environments.
+
+  ```bash .env
+  MERCADOPAGO_RUNTIME_ENVIRONMENT=server
+  ```
+</ParamField>
+
+## Configuration File Structure
+
+```php config/mercadopago.php
+<?php
+
+declare(strict_types=1);
+
+return [
+    'access_token' => env('MERCADOPAGO_ACCESS_TOKEN'),
+    'public_key' => env('MERCADOPAGO_PUBLIC_KEY'),
+    'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
+    'route_prefix' => env('MERCADOPAGO_ROUTE_PREFIX', 'api/mercadopago'),
+    'enable_demo_routes' => (bool) env('MERCADOPAGO_ENABLE_DEMO_ROUTES', true),
+    'runtime_environment' => env('MERCADOPAGO_RUNTIME_ENVIRONMENT'),
+];
+```
+
+## Example Configurations
+
+<Tabs>
+  <Tab title="Local Development">
+    ```bash .env
+    APP_ENV=local
+
+    MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
+    MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    MERCADOPAGO_WEBHOOK_SECRET=test-webhook-secret
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    ```
+
+    - Demo routes are accessible
+    - Webhook validation is enabled
+    - SDK uses `local` runtime automatically
+  </Tab>
+  <Tab title="Production">
+    ```bash .env
+    APP_ENV=production
+
+    MERCADOPAGO_ACCESS_TOKEN=APP_USR-1234567890123456-123456-abc123def456
+    MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    MERCADOPAGO_WEBHOOK_SECRET=your-production-webhook-secret
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    ```
+
+    - Demo routes are disabled
+    - Webhook signature validation is required
+    - SDK uses `server` runtime automatically
+  </Tab>
+  <Tab title="Testing">
+    ```bash .env
+    APP_ENV=testing
+
+    MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
+    MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    MERCADOPAGO_WEBHOOK_SECRET=
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    ```
+
+    - Demo routes are accessible
+    - Webhook validation is optional (useful for testing)
+    - SDK uses `local` runtime automatically
+  </Tab>
+</Tabs>
+
+## Configuration Reference Table
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `MERCADOPAGO_ACCESS_TOKEN` | **Yes** | - | SDK authentication token for API calls |
+| `MERCADOPAGO_PUBLIC_KEY` | No | - | Public key for frontend integrations |
+| `MERCADOPAGO_WEBHOOK_SECRET` | **Recommended** | - | Secret for validating webhook signatures |
+| `MERCADOPAGO_ROUTE_PREFIX` | No | `api/mercadopago` | Prefix for all registered routes |
+| `MERCADOPAGO_ENABLE_DEMO_ROUTES` | No | `true` | Enable demo routes (only works in local/testing) |
+| `MERCADOPAGO_RUNTIME_ENVIRONMENT` | No | Auto-detected | Force SDK runtime: `local` or `server` |
+
+## Verifying Configuration
+
+<Steps>
+  <Step title="Clear configuration cache">
+    ```bash
+    php artisan config:clear
+    ```
+  </Step>
+  <Step title="Test the health endpoint">
+    ```bash
+    curl http://localhost:8000/api/mercadopago/health
+    ```
+
+    Expected response:
+
+    ```json
+    {
+        "ok": true,
+        "data": {
+            "configured": true,
+            "has_public_key": true,
+            "has_webhook_secret": true,
+            "environment": "local"
+        },
+        "meta": []
+    }
+    ```
+  </Step>
+  <Step title="Verify route registration">
+    ```bash
+    php artisan route:list --name=mercadopago
+    ```
+  </Step>
+</Steps>
+
+## Security Best Practices
+
+<Warning>
+  **Never commit credentials to version control.** Always use environment variables and keep `.env` in your `.gitignore`.
+</Warning>
+
+### Development
+
+- Use test credentials from Mercado Pago test users
+- Keep `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` for easier testing
+- Webhook secret is optional but recommended
+
+### Production
+
+<Steps>
+  <Step title="Use production credentials">
+    Replace all test credentials with production access tokens and public keys from your Mercado Pago account.
+  </Step>
+  <Step title="Configure webhook secret">
+    ```bash .env
+    MERCADOPAGO_WEBHOOK_SECRET=your-production-secret
+    ```
+  </Step>
+  <Step title="Disable demo routes">
+    ```bash .env
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    ```
+  </Step>
+  <Step title="Cache configuration">
+    ```bash
+    php artisan config:cache
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### "Mercado Pago access token is not configured"
+
+Set `MERCADOPAGO_ACCESS_TOKEN` and clear config cache:
+
+```bash
+php artisan config:clear
+```
+
+### Demo routes returning 404
+
+**Causes:**
+1. `MERCADOPAGO_ENABLE_DEMO_ROUTES` is not `true`
+2. `APP_ENV` is not `local` or `testing`
+
+```bash
+php artisan route:clear
+php artisan config:clear
+```
+
+### Webhook returning 401 Unauthorized
+
+Check:
+- `MERCADOPAGO_WEBHOOK_SECRET` matches the secret configured in Mercado Pago dashboard
+- The request includes `x-signature` and `x-request-id` headers
+- The `data.id` parameter is present in the query string or payload
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Using Services" icon="wrench" href="/concepts/services">
+    Learn how to inject and use the package services in your application
+  </Card>
+  <Card title="Demo Endpoints" icon="terminal" href="/guides/quickstart">
+    Explore the webhook and demo routes registered by the package
+  </Card>
+</CardGroup>

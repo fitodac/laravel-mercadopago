@@ -1,0 +1,126 @@
+---
+title: "API Reference"
+description: "Complete API reference for all Laravel MercadoPago services"
+---
+
+## PreferenceService
+
+### `create(array $payload): mixed`
+
+Creates a new payment preference.
+
+**Required fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `items` | array | Array of items to purchase |
+| `items.*.title` | string | Item name |
+| `items.*.quantity` | integer | Quantity (min: 1) |
+| `items.*.unit_price` | numeric | Price per unit (min: 0) |
+
+**Optional fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `payer` | array | Payer information |
+| `back_urls` | array | Redirect URLs after payment |
+| `notification_url` | string | Webhook URL |
+| `external_reference` | string | Your internal order reference |
+| `expires` | boolean | Enable expiration |
+| `expiration_date_from` | date | Expiration start |
+| `expiration_date_to` | date | Expiration end |
+| `metadata` | array | Custom data |
+
+## PaymentService
+
+### `create(array $payload): mixed`
+
+Creates a new direct payment.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `transaction_amount` | numeric | Yes | Payment amount |
+| `token` | string | Yes | Card token from MercadoPago.js |
+| `description` | string | Yes | Payment description |
+| `installments` | integer | Yes | Number of installments |
+| `payment_method_id` | string | Yes | Payment method (visa, master, etc) |
+| `payer.email` | string | Yes | Payer's email |
+
+### `get(string $paymentId): mixed`
+
+Retrieves payment details by ID.
+
+## CustomerService
+
+### `create(array $payload): mixed`
+
+Creates a new customer.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `email` | string | Yes | Customer's email |
+| `first_name` | string | No | First name |
+| `last_name` | string | No | Last name |
+
+### `get(string $customerId): mixed`
+
+Retrieves customer details by ID.
+
+## CardService
+
+### `create(string $customerId, array $payload): mixed`
+
+Saves a tokenized card to a customer.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `token` | string | Yes | Card token from MercadoPago.js |
+
+### `delete(string $customerId, string $cardId): mixed`
+
+Removes a saved card from a customer.
+
+## RefundService
+
+### `create(string $paymentId, array $payload = []): mixed`
+
+Processes a full or partial refund.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `amount` | numeric | No | Refund amount. If omitted, full refund is processed |
+
+## PaymentMethodService
+
+### `all(): mixed`
+
+Returns all available payment methods for your Mercado Pago account.
+
+## WebhookService
+
+### `handle(Request $request): array`
+
+Validates and processes an incoming webhook.
+
+**Returns:**
+
+```php
+[
+    'acknowledged' => true,
+    'validated' => true,   // true if signature was verified
+    'topic' => 'payment',  // webhook topic
+    'resource' => '123',   // resource ID
+    'payload' => [...]     // full webhook payload
+]
+```
+
+## TestUserService
+
+### `create(array $payload): mixed`
+
+Creates a test user for sandbox testing.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `site_id` | string | Yes | Country site ID (MLA, MLB, MLC, MLM, MLU, MCO, MPE) |
+| `description` | string | No | Description for the test user |

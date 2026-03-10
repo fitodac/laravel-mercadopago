@@ -1,0 +1,139 @@
+---
+title: "Introduction"
+description: "Laravel MercadoPago is a reusable package for integrating Mercado Pago into Laravel 12 projects with decoupled services and JSON API endpoints."
+---
+
+## Overview
+
+Laravel MercadoPago is a comprehensive integration package that simplifies working with Mercado Pago payment services in Laravel applications. Built with modern PHP practices and Laravel's service container architecture, it provides a clean, testable interface to the Mercado Pago SDK.
+
+## What It Solves
+
+This package handles the complexity of Mercado Pago integration by:
+
+- **Credential Management** - Resolves credentials from configuration and environment variables automatically
+- **SDK Configuration** - Configures the Mercado Pago SDK with access tokens and runtime environment settings
+- **Service Layer** - Provides injectable services for all major Mercado Pago operations
+- **Webhook Security** - Registers a webhook endpoint with HMAC signature validation when a secret is configured
+- **Development Support** - Exposes demo routes for local testing and development
+
+The package focuses on encapsulating communication with the Mercado Pago SDK and exposing a reusable API foundation. It does **not** include migrations, Blade views, frontend components, payment persistence, or pre-configured queues.
+
+## Key Features
+
+### Comprehensive Service Coverage
+
+The package includes dedicated services for all major Mercado Pago operations:
+
+- **PreferenceService** - Create and manage payment preferences for Checkout Pro
+- **PaymentService** - Process and query payments
+- **RefundService** - Handle full and partial refunds
+- **CustomerService** - Manage customer records
+- **CardService** - Store and manage customer cards
+- **PaymentMethodService** - Query available payment methods
+- **TestUserService** - Generate test users for QA environments
+- **WebhookService** - Receive and validate Mercado Pago notifications
+
+### Auto-Discovery Support
+
+The package leverages Laravel's package auto-discovery feature, automatically registering:
+
+```
+Fitodac\LaravelMercadoPago\LaravelMercadoPagoServiceProvider::class
+```
+
+No manual service provider registration required.
+
+### Flexible Route Configuration
+
+- **Always Active**: Production webhook endpoint at `/api/mercadopago/webhooks`
+- **Demo Routes**: Development and testing endpoints (enabled only in `local` and `testing` environments)
+- **Customizable Prefix**: Configure route prefixes via environment variables
+
+### Security First
+
+- HMAC signature validation for webhook authenticity
+- Environment-based credential resolution
+- Demo route protection (disabled in production)
+- Configurable runtime environments
+
+## Requirements
+
+<Steps>
+  <Step title="PHP 8.2 or higher">
+    The package requires PHP `^8.2` with strict type declarations.
+  </Step>
+  <Step title="Laravel 12">
+    Compatible with Laravel 12 framework components:
+    - `illuminate/contracts ^12.0`
+    - `illuminate/http ^12.0`
+    - `illuminate/routing ^12.0`
+    - `illuminate/support ^12.0`
+  </Step>
+  <Step title="Mercado Pago SDK">
+    Includes the official Mercado Pago PHP SDK `mercadopago/dx-php ^3.8`
+  </Step>
+</Steps>
+
+## What's NOT Included
+
+To maintain focus and flexibility, this package intentionally excludes:
+
+- **Database migrations** - Payment persistence logic belongs in your application
+- **Blade views** - Frontend integration is project-specific
+- **UI components** - JavaScript widgets and checkout forms are implemented separately
+- **Job queues** - Queue configuration depends on your architecture
+- **Business logic** - Authentication, authorization, and domain rules stay in your app
+
+The demo routes are support tools, not a complete business layer. For production use, inject the services into your own controllers with proper authentication and authorization.
+
+## Architecture Philosophy
+
+Laravel MercadoPago follows a **service-oriented architecture**:
+
+1. **Services encapsulate SDK calls** - Each service wraps specific Mercado Pago API functionality
+2. **Dependency injection ready** - All services are registered as singletons in the container
+3. **Controller-agnostic** - Use the services in controllers, actions, jobs, or commands
+4. **Testable** - Services can be mocked and tested independently
+
+### Recommended Implementation Pattern
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Http\Request;
+
+class CheckoutController
+{
+    public function __construct(
+        private PreferenceService $preferenceService
+    ) {}
+    
+    public function createPreference(Request $request)
+    {
+        $validated = $request->validate([
+            'items' => 'required|array',
+            'items.*.title' => 'required|string',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_price' => 'required|numeric|min:0',
+        ]);
+        
+        $preference = $this->preferenceService->create($validated);
+        
+        return response()->json([
+            'id' => $preference['id'],
+            'init_point' => $preference['init_point'],
+        ]);
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the package via Composer and configure auto-discovery
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Set up environment variables and publish configuration files
+  </Card>
+</CardGroup>

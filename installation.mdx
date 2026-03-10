@@ -1,0 +1,189 @@
+---
+title: "Installation"
+description: "Install Laravel MercadoPago using Composer with local path repository or versioned package approaches."
+---
+
+## Installation Methods
+
+Laravel MercadoPago can be installed in two ways depending on your project structure and package distribution strategy.
+
+<Tabs>
+  <Tab title="Local Path Repository">
+    Use this method when the package lives within your repository or in a sibling directory. Ideal for monorepo setups or local development.
+  </Tab>
+  <Tab title="Versioned Package">
+    Use this method when the package is available from a Composer registry, private repository, or VCS source.
+  </Tab>
+</Tabs>
+
+## Option A: Local Path Repository
+
+This is the most direct approach when the package exists within your project structure.
+
+<Steps>
+  <Step title="Copy or clone the package">
+    Place the package inside your Laravel project directory. A common convention is to use a `plugins/` or `packages/` folder:
+
+    ```
+    my-laravel-app/
+    ├── app/
+    ├── config/
+    ├── plugins/
+    │   └── laravel-mercadopago/
+    │       ├── src/
+    │       ├── config/
+    │       ├── routes/
+    │       └── composer.json
+    └── composer.json
+    ```
+  </Step>
+  <Step title="Register the local repository">
+    Add the path repository configuration to your project's `composer.json`:
+
+    ```json composer.json
+    {
+        "repositories": [
+            {
+                "type": "path",
+                "url": "plugins/laravel-mercadopago",
+                "options": {
+                    "symlink": true
+                }
+            }
+        ]
+    }
+    ```
+
+    The `symlink: true` option creates a symbolic link instead of copying files, allowing you to edit the package code directly.
+  </Step>
+  <Step title="Install the package">
+    Run Composer to require the package:
+
+    ```bash
+    composer require fitodac/laravel-mercadopago:^1.0
+    ```
+  </Step>
+  <Step title="Verify auto-discovery">
+    Confirm that Laravel has registered the package provider and routes:
+
+    ```bash
+    php artisan package:discover
+    php artisan route:list --name=mercadopago
+    ```
+  </Step>
+</Steps>
+
+## Option B: Versioned Package
+
+If your project has access to the package from a Composer registry, private repository, or VCS source, installation is straightforward.
+
+<Steps>
+  <Step title="Install via Composer">
+    ```bash
+    composer require fitodac/laravel-mercadopago:^1.0
+    ```
+  </Step>
+  <Step title="Verify installation">
+    ```bash
+    php artisan package:discover
+    php artisan route:list --name=mercadopago
+    ```
+
+    With this method, you don't need the `repositories` section in your `composer.json`.
+  </Step>
+</Steps>
+
+## Auto-Discovery
+
+The package uses Laravel's [package auto-discovery](https://laravel.com/docs/packages#package-discovery) feature. The service provider is automatically registered via the `extra.laravel.providers` key in the package's `composer.json`:
+
+```json composer.json
+{
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Fitodac\\LaravelMercadoPago\\LaravelMercadoPagoServiceProvider"
+            ]
+        }
+    }
+}
+```
+
+This means **no manual provider registration** is required in your `config/app.php`.
+
+## Registered Services
+
+Once installed, the following services are available for dependency injection:
+
+<CodeGroup>
+
+```php PreferenceService
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+
+public function __construct(
+    private PreferenceService $preferenceService
+) {}
+```
+
+</CodeGroup>
+
+All services are registered as **singletons** in the service container:
+
+- `PaymentMethodService`
+- `PreferenceService`
+- `PaymentService`
+- `RefundService`
+- `CustomerService`
+- `CardService`
+- `WebhookService`
+- `TestUserService`
+
+## Verification
+
+After installation, verify everything is working correctly:
+
+<Steps>
+  <Step title="Check package discovery">
+    ```bash
+    php artisan package:discover
+    ```
+  </Step>
+  <Step title="List registered routes">
+    ```bash
+    php artisan route:list --name=mercadopago
+    ```
+  </Step>
+  <Step title="Check autoloading (optional)">
+    ```bash
+    composer dump-autoload
+    php artisan package:discover
+    php artisan route:list --name=mercadopago
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Routes not appearing
+
+```bash
+composer dump-autoload
+php artisan package:discover
+php artisan route:clear
+php artisan route:list --name=mercadopago
+```
+
+### Demo routes returning 404
+
+Demo routes are only available when:
+
+1. `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` in your `.env`
+2. Your `APP_ENV` is `local` or `testing`
+
+In production environments, demo routes are **always disabled** regardless of configuration.
+
+## Next Steps
+
+<Card title="Configuration" icon="gear" href="/configuration">
+  Configure environment variables, publish the config file, and set up your Mercado Pago credentials.
+</Card>

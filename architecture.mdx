@@ -1,0 +1,270 @@
+---
+title: "Architecture"
+description: "Understanding the Laravel MercadoPago package architecture and design principles"
+---
+
+# Package Architecture
+
+Laravel MercadoPago is built with clean architecture principles, leveraging Laravel's service container, dependency injection, and auto-discovery to provide a maintainable and testable integration with Mercado Pago.
+
+## Architectural Overview
+
+The package follows a layered architecture that separates concerns and promotes code reusability:
+
+<CardGroup cols={2}>
+  <Card title="Service Layer" icon="layer-group">
+    Dedicated service classes for each Mercado Pago resource
+  </Card>
+  <Card title="Support Layer" icon="gear">
+    Factory and helper classes for SDK client management
+  </Card>
+  <Card title="Contract Layer" icon="file-contract">
+    Interfaces for extensibility and testing
+  </Card>
+  <Card title="DTO Layer" icon="cube">
+    Data Transfer Objects for type-safe credential handling
+  </Card>
+</CardGroup>
+
+## Core Components
+
+### Service Provider
+
+The `LaravelMercadoPagoServiceProvider` is the entry point for package registration and bootstrapping.
+
+```php
+final class LaravelMercadoPagoServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->mergeConfigFrom(__DIR__ . '/../config/mercadopago.php', 'mercadopago');
+
+        $this->app->bind(CredentialResolverInterface::class, EnvCredentialResolver::class);
+        
+        $this->app->singleton(MercadoPagoClientFactory::class);
+        $this->app->singleton(SdkHttpClient::class);
+        $this->app->singleton(PreferenceService::class);
+        $this->app->singleton(PaymentService::class);
+        // ... other services
+    }
+
+    public function boot(Router $router): void
+    {
+        $this->publishes([
+            __DIR__ . '/../config/mercadopago.php' => config_path('mercadopago.php'),
+        ], 'mercadopago-config');
+
+        $router->aliasMiddleware('mercadopago.demo', EnsureDemoRoutesEnabled::class);
+        $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
+    }
+}
+```
+
+### Auto-Discovery
+
+The package leverages Laravel's package auto-discovery feature. When you install the package via Composer, Laravel automatically:
+
+1. Detects the service provider in `composer.json`
+2. Registers the service provider on application boot
+3. Binds all services to the container
+4. Loads package routes and middleware
+
+No manual provider registration is needed.
+
+### Dependency Injection
+
+All services are registered as singletons in Laravel's service container:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+
+class CheckoutController extends Controller
+{
+    public function __construct(
+        private PreferenceService $preferenceService
+    ) {}
+
+    public function create()
+    {
+        $preference = $this->preferenceService->create([
+            'items' => [/* ... */]
+        ]);
+    }
+}
+```
+
+**Benefits of singleton registration:**
+- Services are instantiated once per request lifecycle
+- Reduced memory footprint and initialization overhead
+- Shared SDK configuration across all services
+- Consistent credential resolution
+
+## Service Layer
+
+Each service encapsulates operations for a specific Mercado Pago resource:
+
+- **PreferenceService** - Payment preferences
+- **PaymentService** - Payment processing
+- **CustomerService** - Customer management
+- **CardService** - Customer cards
+- **RefundService** - Refund operations
+- **PaymentMethodService** - Payment methods
+- **WebhookService** - Webhook validation
+- **TestUserService** - Test user creation
+
+## Support Layer
+
+### MercadoPagoClientFactory
+
+The factory handles SDK client instantiation and configuration. Key responsibilities:
+
+1. **SDK Configuration** - Configures the Mercado Pago SDK with access tokens
+2. **Client Resolution** - Dynamically instantiates SDK client classes
+3. **Method Compatibility** - Handles SDK version differences
+4. **Runtime Environment** - Sets appropriate environment (local/server)
+
+```php
+public function makeFirstAvailable(array $clientClasses): object
+{
+    $this->configureSdk();
+
+    foreach ($clientClasses as $clientClass) {
+        if (class_exists($clientClass)) {
+            return new $clientClass();
+        }
+    }
+
+    throw MercadoPagoConfigurationException::clientClassNotFound($clientClasses);
+}
+```
+
+<Accordion title="Why use makeFirstAvailable?">
+  The Mercado Pago SDK occasionally changes class names between versions. The `makeFirstAvailable` method allows the package to support multiple SDK versions by attempting to instantiate clients from an array of possible class names. This ensures backward and forward compatibility without requiring package updates for every SDK change.
+</Accordion>
+
+### SdkHttpClient
+
+Provides low-level HTTP access to Mercado Pago's API for endpoints not covered by the SDK. Used by `TestUserService` for creating test users via direct API calls.
+
+## Contract Layer
+
+### CredentialResolverInterface
+
+Defines the contract for credential resolution, enabling custom implementations.
+
+```php
+interface CredentialResolverInterface
+{
+    public function resolve(): MercadoPagoCredentials;
+}
+```
+
+The default implementation (`EnvCredentialResolver`) reads from Laravel's configuration, but you can bind your own resolver for:
+- Database-backed credentials
+- Multi-tenant configurations
+- Vault or secrets manager integration
+- Per-user credential resolution
+
+## DTO Layer
+
+### MercadoPagoCredentials
+
+A readonly Data Transfer Object for type-safe credential handling.
+
+```php
+final readonly class MercadoPagoCredentials
+{
+    public function __construct(
+        public string $accessToken,
+        public ?string $publicKey = null,
+        public ?string $webhookSecret = null,
+    ) {}
+}
+```
+
+## Exception Handling
+
+### MercadoPagoConfigurationException
+
+Thrown when:
+- Access token is missing
+- SDK is not installed
+- Client class not found
+- Client method not found
+
+### InvalidWebhookSignatureException
+
+Thrown when:
+- Webhook signature header is malformed
+- HMAC signature validation fails
+
+## Design Principles
+
+### 1. Single Responsibility
+
+Each service class handles exactly one Mercado Pago resource type.
+
+### 2. Dependency Inversion
+
+Services depend on abstractions (`CredentialResolverInterface`) rather than concrete implementations.
+
+### 3. Open/Closed Principle
+
+The package is open for extension (implement custom credential resolvers) but closed for modification.
+
+### 4. Interface Segregation
+
+The `CredentialResolverInterface` contains only one method, ensuring implementing classes aren't forced to implement unused methods.
+
+## Extending the Package
+
+### Custom Credential Resolver
+
+```php
+namespace App\Services;
+
+use Fitodac\LaravelMercadoPago\Contracts\CredentialResolverInterface;
+use Fitodac\LaravelMercadoPago\DTO\MercadoPagoCredentials;
+
+class DatabaseCredentialResolver implements CredentialResolverInterface
+{
+    public function resolve(): MercadoPagoCredentials
+    {
+        $credentials = \DB::table('payment_credentials')
+            ->where('provider', 'mercadopago')
+            ->first();
+
+        return new MercadoPagoCredentials(
+            accessToken: $credentials->access_token,
+            publicKey: $credentials->public_key,
+            webhookSecret: $credentials->webhook_secret,
+        );
+    }
+}
+```
+
+Bind in `AppServiceProvider`:
+
+```php
+use Fitodac\LaravelMercadoPago\Contracts\CredentialResolverInterface;
+use App\Services\DatabaseCredentialResolver;
+
+public function register()
+{
+    $this->app->bind(
+        CredentialResolverInterface::class, 
+        DatabaseCredentialResolver::class
+    );
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Services" icon="wrench" href="/concepts/services">
+    Explore all available services and their methods
+  </Card>
+  <Card title="Credentials" icon="key" href="/concepts/credentials">
+    Learn about credential management and security
+  </Card>
+</CardGroup>

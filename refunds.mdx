@@ -1,0 +1,125 @@
+---
+title: "Refunds"
+description: "Process full and partial refunds for MercadoPago payments"
+---
+
+The package provides simple methods for processing both full and partial refunds on approved payments.
+
+<Warning>
+  Only **approved** payments can be refunded. Refunds cannot be reversed once processed.
+</Warning>
+
+## Full refunds
+
+```php
+<?php
+
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+
+final class RefundController
+{
+    public function store(
+        string $paymentId,
+        RefundService $refundService
+    ): JsonResponse {
+        $refund = $refundService->create($paymentId);
+
+        return response()->json($refund, 201);
+    }
+}
+```
+
+## Partial refunds
+
+```php
+$payload = $request->validate([
+    'amount' => ['required', 'numeric', 'min:0.01'],
+]);
+
+$refund = $refundService->create($paymentId, $payload);
+```
+
+## Refund response
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": 987654321,
+    "payment_id": 123456789,
+    "amount": 50.00,
+    "status": "approved",
+    "date_created": "2026-03-10T14:30:00.000-03:00"
+  },
+  "meta": []
+}
+```
+
+## Common patterns
+
+### Refunding with order validation
+
+```php
+$order = Order::where('id', $orderId)
+    ->where('user_id', auth()->id())
+    ->firstOrFail();
+
+if ($order->status !== 'paid') {
+    return response()->json(['error' => 'Only paid orders can be refunded'], 422);
+}
+
+$refund = $refundService->create(
+    $order->mercadopago_payment_id,
+    $request->only(['amount'])
+);
+
+$order->update([
+    'status' => 'refunded',
+    'refunded_amount' => data_get($refund, 'amount'),
+    'refunded_at' => now(),
+]);
+```
+
+### Automatic refund on order cancellation
+
+```php
+class CancelOrderAction
+{
+    public function execute(Order $order): void
+    {
+        if ($order->status === 'paid' && $order->mercadopago_payment_id) {
+            $refund = $this->refundService->create($order->mercadopago_payment_id);
+            
+            $order->update([
+                'status' => 'refunded',
+                'refund_id' => data_get($refund, 'id'),
+            ]);
+        } else {
+            $order->update(['status' => 'cancelled']);
+        }
+    }
+}
+```
+
+## Best practices
+
+Always validate payment status before refunding:
+
+```php
+$payment = $paymentService->get($paymentId);
+
+if (data_get($payment, 'status') !== 'approved') {
+    throw new \Exception('Only approved payments can be refunded');
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+    Handle refund notifications
+  </Card>
+  <Card title="Testing" icon="flask" href="/guides/testing">
+    Test refund workflows locally
+  </Card>
+</CardGroup>

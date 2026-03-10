@@ -1,0 +1,197 @@
+---
+title: "Creating Preferences"
+description: "Learn how to create and customize MercadoPago payment preferences"
+---
+
+Payment preferences are the foundation of MercadoPago's checkout experience. They define what items your customer is purchasing, where to redirect them after payment, and how to notify your system.
+
+## Understanding preferences
+
+A preference contains:
+
+- **Items**: Products or services being purchased
+- **Payer information**: Buyer's email and optional details
+- **URLs**: Where to redirect users after payment
+- **Notification URL**: Where MercadoPago sends webhook notifications
+- **External reference**: Your internal order/transaction ID
+
+## Basic preference creation
+
+<Tabs>
+  <Tab title="Using PreferenceService">
+    ```php
+    <?php
+
+    use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+    use Illuminate\Http\JsonResponse;
+    use Illuminate\Http\Request;
+
+    final class CheckoutPreferenceController
+    {
+        public function store(
+            Request $request,
+            PreferenceService $preferenceService
+        ): JsonResponse {
+            $payload = $request->validate([
+                'items' => ['required', 'array', 'min:1'],
+                'items.*.title' => ['required', 'string'],
+                'items.*.quantity' => ['required', 'integer', 'min:1'],
+                'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+                'payer' => ['sometimes', 'array'],
+                'back_urls' => ['sometimes', 'array'],
+                'notification_url' => ['sometimes', 'url'],
+                'external_reference' => ['sometimes', 'string'],
+            ]);
+
+            $preference = $preferenceService->create($payload);
+
+            return response()->json([
+                'id' => data_get($preference, 'id'),
+                'init_point' => data_get($preference, 'init_point'),
+                'sandbox_init_point' => data_get($preference, 'sandbox_init_point'),
+            ], 201);
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Using demo endpoint">
+    ```bash
+    curl --request POST \
+      --url http://localhost:8000/api/mercadopago/preferences \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "items": [{"title": "Product", "quantity": 1, "unit_price": 100}]
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Payload structure
+
+### Required fields
+
+```json
+{
+  "items": [
+    {
+      "title": "Product name",
+      "quantity": 1,
+      "unit_price": 100.50
+    }
+  ]
+}
+```
+
+### Complete payload example
+
+```json
+{
+  "items": [
+    {
+      "title": "Premium Subscription",
+      "quantity": 1,
+      "unit_price": 99.99,
+      "currency_id": "ARS",
+      "description": "Monthly premium subscription"
+    }
+  ],
+  "payer": {
+    "email": "customer@example.com",
+    "name": "Ada",
+    "surname": "Lovelace"
+  },
+  "back_urls": {
+    "success": "https://your-app.com/payments/success",
+    "pending": "https://your-app.com/payments/pending",
+    "failure": "https://your-app.com/payments/failure"
+  },
+  "notification_url": "https://your-app.com/api/mercadopago/webhooks",
+  "external_reference": "ORDER-12345",
+  "expires": true,
+  "expiration_date_from": "2026-03-10T09:00:00.000-03:00",
+  "expiration_date_to": "2026-03-15T23:59:59.000-03:00",
+  "metadata": {
+    "user_id": "98765",
+    "subscription_plan": "premium"
+  }
+}
+```
+
+## Field validation rules
+
+| Field | Rule | Description |
+|---|---|---|
+| `items` | `required, array, min:1` | At least one item required |
+| `items.*.title` | `required, string` | Item name |
+| `items.*.quantity` | `required, integer, min:1` | Quantity must be positive |
+| `items.*.unit_price` | `required, numeric, min:0` | Price cannot be negative |
+| `payer` | `sometimes, array` | Optional payer information |
+| `back_urls` | `sometimes, array` | Optional redirect URLs |
+| `notification_url` | `sometimes, url` | Must be valid URL |
+| `external_reference` | `sometimes, string` | Your internal reference |
+
+## Understanding URLs
+
+### Back URLs
+
+```json
+{
+  "back_urls": {
+    "success": "https://your-app.com/payments/success",
+    "pending": "https://your-app.com/payments/pending",
+    "failure": "https://your-app.com/payments/failure"
+  }
+}
+```
+
+<Warning>
+  Back URLs are for user experience only. Never rely on them for payment confirmation. Always use webhooks for server-side processing.
+</Warning>
+
+### Notification URL
+
+```json
+{
+  "notification_url": "https://your-app.com/api/mercadopago/webhooks"
+}
+```
+
+## Common patterns
+
+### Linking preferences to orders
+
+```php
+$order = Order::create([...]);
+
+$preference = $preferenceService->create([
+    'items' => $order->items->map(fn($item) => [
+        'title' => $item->name,
+        'quantity' => $item->quantity,
+        'unit_price' => $item->price,
+    ])->toArray(),
+    'external_reference' => "ORDER-{$order->id}",
+    'notification_url' => route('mercadopago.webhooks.store'),
+]);
+```
+
+### Setting expiration
+
+```php
+$preference = $preferenceService->create([
+    'items' => [...],
+    'expires' => true,
+    'expiration_date_from' => now()->toIso8601String(),
+    'expiration_date_to' => now()->addHours(24)->toIso8601String(),
+]);
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Processing Payments" icon="credit-card" href="/guides/processing-payments">
+    Learn about direct payment processing
+  </Card>
+  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+    Process payment notifications
+  </Card>
+</CardGroup>

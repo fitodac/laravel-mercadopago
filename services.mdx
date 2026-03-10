@@ -1,0 +1,200 @@
+---
+title: "Services"
+description: "Overview of all Laravel MercadoPago services, their purpose, and relationships"
+---
+
+# Services Overview
+
+Laravel MercadoPago provides eight dedicated service classes, each handling a specific aspect of the Mercado Pago integration. All services are registered as singletons and can be injected via dependency injection.
+
+## Service Architecture
+
+All services follow a consistent pattern:
+1. **Dependency on MercadoPagoClientFactory** - Services use the factory to obtain SDK clients
+2. **SDK Abstraction** - Services wrap SDK client methods with clean Laravel-friendly interfaces
+3. **Type Safety** - Accept and return properly typed data structures
+4. **Version Compatibility** - Handle SDK version differences transparently
+
+## Core Services
+
+### PreferenceService
+
+**Purpose**: Create payment preferences for Mercado Pago checkout flows
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+
+class CheckoutController extends Controller
+{
+    public function __construct(
+        private PreferenceService $preferenceService
+    ) {}
+
+    public function createCheckout()
+    {
+        $preference = $this->preferenceService->create([
+            'items' => [
+                [
+                    'title' => 'Premium Subscription',
+                    'quantity' => 1,
+                    'unit_price' => 99.99,
+                ]
+            ],
+            'payer' => ['email' => 'customer@example.com'],
+            'back_urls' => [
+                'success' => route('payment.success'),
+                'failure' => route('payment.failure'),
+                'pending' => route('payment.pending')
+            ],
+        ]);
+
+        return redirect($preference->init_point);
+    }
+}
+```
+
+### PaymentService
+
+**Purpose**: Process direct payments and retrieve payment information
+
+**Methods**:
+```php
+public function create(array $payload): mixed
+public function get(string $paymentId): mixed
+```
+
+```php
+$payment = $this->paymentService->create([
+    'transaction_amount' => 150.00,
+    'token' => $request->input('token'),
+    'description' => 'Product purchase',
+    'installments' => 1,
+    'payment_method_id' => 'visa',
+    'payer' => ['email' => $request->input('email')]
+]);
+```
+
+### CustomerService
+
+**Purpose**: Manage customer records in Mercado Pago
+
+**Methods**:
+```php
+public function create(array $payload): mixed
+public function get(string $customerId): mixed
+```
+
+<Note>
+  Always create a customer before saving cards. Cards must be associated with a customer ID.
+</Note>
+
+### CardService
+
+**Purpose**: Manage saved payment cards for customers
+
+**Methods**:
+```php
+public function create(string $customerId, array $payload): mixed
+public function delete(string $customerId, string $cardId): mixed
+```
+
+### RefundService
+
+**Purpose**: Process full and partial refunds for completed payments
+
+```php
+// Full refund
+$refund = $this->refundService->create($paymentId);
+
+// Partial refund
+$refund = $this->refundService->create($paymentId, ['amount' => 50.00]);
+```
+
+<Warning>
+  Refunds can only be issued on payments with status `approved`.
+</Warning>
+
+### PaymentMethodService
+
+**Purpose**: Retrieve available payment methods for the configured country
+
+```php
+$methods = $this->paymentMethodService->all();
+```
+
+### WebhookService
+
+**Purpose**: Handle and validate incoming Mercado Pago webhooks
+
+```php
+$webhook = $this->webhookService->handle($request);
+
+// Returns:
+// [
+//     'acknowledged' => true,
+//     'validated' => true,
+//     'topic' => 'payment',
+//     'resource' => '123456789',
+//     'payload' => [...]
+// ]
+```
+
+### TestUserService
+
+**Purpose**: Create test users for development and QA automation
+
+```php
+$testUser = $this->testUserService->create([
+    'site_id' => 'MLA' // Argentina
+]);
+```
+
+## Common Patterns
+
+### Constructor Injection
+
+```php
+class CheckoutService
+{
+    public function __construct(
+        private PreferenceService $preferenceService,
+        private PaymentService $paymentService,
+        private WebhookService $webhookService
+    ) {}
+}
+```
+
+### Method Injection
+
+```php
+public function process(Request $request, PaymentService $paymentService)
+{
+    return $paymentService->create($request->all());
+}
+```
+
+### Error Handling
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+use MercadoPago\Exceptions\MPApiException;
+
+try {
+    $payment = $paymentService->create($data);
+} catch (MercadoPagoConfigurationException $e) {
+    return response()->json(['error' => 'Service misconfigured'], 500);
+} catch (MPApiException $e) {
+    return response()->json(['error' => $e->getMessage()], 400);
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Preferences" icon="receipt" href="/guides/creating-preferences">
+    Build your first checkout flow
+  </Card>
+  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+    Process payment notifications
+  </Card>
+</CardGroup>

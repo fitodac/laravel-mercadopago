@@ -1,0 +1,163 @@
+---
+title: "Testing"
+description: "Test your MercadoPago integration locally with demo routes and test users"
+---
+
+The package includes demo routes and utilities to help you test your integration without making real payments.
+
+## Demo routes
+
+Demo routes are special endpoints that only work in `local` and `testing` environments.
+
+### Enabling demo routes
+
+```bash .env
+APP_ENV=local
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+```
+
+### Available demo routes
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/health` | Verify configuration |
+| `GET` | `/payment-methods` | List available payment methods |
+| `POST` | `/preferences` | Create payment preference |
+| `POST` | `/payments` | Create direct payment |
+| `GET` | `/payments/{id}` | Get payment details |
+| `POST` | `/payments/{id}/refunds` | Refund payment |
+| `POST` | `/customers` | Create customer |
+| `GET` | `/customers/{id}` | Get customer details |
+| `POST` | `/customers/{id}/cards` | Add card to customer |
+| `DELETE` | `/customers/{id}/cards/{cardId}` | Delete customer card |
+| `POST` | `/test-users` | Create test user |
+
+## Testing with cURL
+
+### Health check
+
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
+
+### Create preference
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/preferences \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "items": [{"title": "Test Product", "quantity": 1, "unit_price": 100}]
+  }'
+```
+
+### Create refund
+
+```bash
+# Full refund
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/payments/123456789/refunds \
+  --header 'Content-Type: application/json' \
+  --data '{}'
+
+# Partial refund
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/payments/123456789/refunds \
+  --header 'Content-Type: application/json' \
+  --data '{"amount": 50}'
+```
+
+## Test users
+
+Create test users using the demo endpoint:
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/test-users \
+  --header 'Content-Type: application/json' \
+  --data '{"site_id": "MLA", "description": "Test user for QA"}'
+```
+
+### Supported site IDs
+
+| Site ID | Country |
+|---|---|
+| `MLA` | Argentina |
+| `MLB` | Brazil |
+| `MLC` | Chile |
+| `MLM` | Mexico |
+| `MLU` | Uruguay |
+| `MCO` | Colombia |
+| `MPE` | Peru |
+
+## Testing webhooks locally
+
+Use tunneling services to expose your local server:
+
+```bash
+# Using ngrok
+ngrok http 8000
+```
+
+### Manual webhook simulation
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/webhooks \
+  --header 'Content-Type: application/json' \
+  --header 'x-request-id: test-request-123' \
+  --data '{"type": "payment", "data": {"id": "123456789"}}'
+```
+
+## Automated testing
+
+### Mocking services
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+public function test_processes_payment()
+{
+    $this->mock(PaymentService::class, function ($mock) {
+        $mock->shouldReceive('create')
+            ->once()
+            ->andReturn([
+                'id' => 123456789,
+                'status' => 'approved',
+            ]);
+    });
+
+    $response = $this->postJson('/checkout/payment', [...]);
+    $response->assertStatus(201);
+}
+```
+
+## Common testing issues
+
+### 404 on demo routes
+
+```bash
+php artisan tinker
+>>> app()->environment()  # Must be 'local' or 'testing'
+>>> config('mercadopago.enable_demo_routes')  # Must be true
+```
+
+### Routes not found
+
+```bash
+composer dump-autoload
+php artisan package:discover
+php artisan route:clear
+php artisan route:cache
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Production Deployment" icon="server" href="/deployment/production">
+    Deploy securely to production
+  </Card>
+  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+    Set up production webhook handling
+  </Card>
+</CardGroup>

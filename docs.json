@@ -1,0 +1,81 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Laravel MercadoPago",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#009EE3",
+    "light": "#47C6FF",
+    "dark": "#0077AA"
+  },
+  "topbarLinks": [
+    {
+      "name": "fitodac/laravel-mercadopago",
+      "url": "https://github.com/fitodac/laravel-mercadopago"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "fitodac/laravel-mercadopago",
+    "url": "https://github.com/fitodac/laravel-mercadopago"
+  },
+  "tabs": [
+    {
+      "name": "Documentation",
+      "url": "/"
+    },
+    {
+      "name": "API Reference",
+      "url": "/api/preference-service"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "introduction",
+        "installation",
+        "configuration"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "concepts/architecture",
+        "concepts/services",
+        "concepts/credentials"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/quickstart",
+        "guides/creating-preferences",
+        "guides/processing-payments",
+        "guides/handling-webhooks",
+        "guides/managing-customers",
+        "guides/refunds",
+        "guides/testing"
+      ]
+    },
+    {
+      "group": "Deployment",
+      "pages": [
+        "deployment/production",
+        "deployment/security"
+      ]
+    },
+    {
+      "group": "Troubleshooting",
+      "pages": [
+        "troubleshooting/common-issues",
+        "troubleshooting/debugging"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/fitodac/laravel-mercadopago"
+  }
+}

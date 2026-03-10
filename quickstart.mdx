@@ -1,0 +1,155 @@
+---
+title: "Quickstart"
+description: "Get your first MercadoPago payment working in minutes"
+---
+
+This guide will walk you through installing the package, configuring credentials, and creating your first payment preference.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- PHP `^8.2`
+- Laravel `^12.0`
+- A MercadoPago account with API credentials
+
+## Installation
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    composer require fitodac/laravel-mercadopago:^1.0
+    ```
+
+    The package uses Laravel's auto-discovery, so the service provider will be registered automatically.
+  </Step>
+  <Step title="Verify package registration">
+    ```bash
+    php artisan package:discover
+    php artisan route:list --name=mercadopago
+    ```
+  </Step>
+  <Step title="Publish configuration (optional)">
+    ```bash
+    php artisan vendor:publish --tag=mercadopago-config
+    ```
+  </Step>
+  <Step title="Configure environment variables">
+    ```bash .env
+    MERCADOPAGO_ACCESS_TOKEN=your_access_token_here
+    MERCADOPAGO_PUBLIC_KEY=your_public_key_here
+    MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret_here
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    ```
+
+    <Warning>
+      Never commit real credentials to your repository.
+    </Warning>
+  </Step>
+  <Step title="Test the configuration">
+    ```bash
+    curl http://localhost:8000/api/mercadopago/health
+    ```
+
+    Expected response:
+
+    ```json
+    {
+      "ok": true,
+      "data": {
+        "configured": true,
+        "has_public_key": true,
+        "has_webhook_secret": true,
+        "environment": "local"
+      },
+      "meta": []
+    }
+    ```
+  </Step>
+  <Step title="Create your first preference">
+    ```bash
+    curl --request POST \
+      --url http://localhost:8000/api/mercadopago/preferences \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "items": [
+          {
+            "title": "My First Product",
+            "quantity": 1,
+            "unit_price": 100.50
+          }
+        ],
+        "payer": {
+          "email": "buyer@example.com"
+        }
+      }'
+    ```
+
+    Response:
+
+    ```json
+    {
+      "ok": true,
+      "data": {
+        "id": "1234567890-abc123def456",
+        "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=...",
+        "sandbox_init_point": "https://sandbox.mercadopago.com/checkout/v1/redirect?pref_id=..."
+      },
+      "meta": []
+    }
+    ```
+  </Step>
+</Steps>
+
+## Using services in your own controllers
+
+While demo routes are helpful for testing, in production you should inject services into your own controllers:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class CheckoutController
+{
+    public function createPreference(
+        Request $request,
+        PreferenceService $preferenceService
+    ): JsonResponse {
+        $payload = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.title' => ['required', 'string'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $preference = $preferenceService->create($payload);
+
+        return response()->json([
+            'id' => data_get($preference, 'id'),
+            'init_point' => data_get($preference, 'init_point'),
+        ], 201);
+    }
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Preferences" icon="receipt" href="/guides/creating-preferences">
+    Learn about all preference options and customization
+  </Card>
+  <Card title="Processing Payments" icon="credit-card" href="/guides/processing-payments">
+    Process direct payments with tokenized cards
+  </Card>
+  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+    Receive and validate payment notifications
+  </Card>
+  <Card title="Testing" icon="flask" href="/guides/testing">
+    Set up local testing with test users
+  </Card>
+</CardGroup>

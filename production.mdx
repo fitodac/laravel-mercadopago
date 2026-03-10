@@ -1,0 +1,127 @@
+---
+title: "Production Deployment"
+description: "Deploy Laravel MercadoPago to production with recommended configuration and best practices"
+---
+
+## Prerequisites
+
+- PHP `^8.2` installed on your production server
+- Laravel `^12.0` configured and working
+- Valid MercadoPago production credentials
+- HTTPS enabled on your domain
+
+## Environment Variables
+
+<Steps>
+  <Step title="Configure production environment">
+    ```bash .env
+    APP_ENV=production
+    MERCADOPAGO_ACCESS_TOKEN=your_production_access_token
+    MERCADOPAGO_PUBLIC_KEY=your_production_public_key
+    MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    composer install --no-dev --optimize-autoloader
+    ```
+  </Step>
+  <Step title="Verify package registration">
+    ```bash
+    php artisan package:discover
+    php artisan route:list --name=mercadopago
+    ```
+  </Step>
+</Steps>
+
+## Cache Optimization
+
+<Steps>
+  <Step title="Clear existing caches">
+    ```bash
+    php artisan config:clear
+    php artisan cache:clear
+    php artisan route:clear
+    ```
+  </Step>
+  <Step title="Build production caches">
+    ```bash
+    php artisan config:cache
+    php artisan route:cache
+    php artisan view:cache
+    ```
+  </Step>
+</Steps>
+
+## Production Deployment Checklist
+
+<Steps>
+  <Step title="Security configuration">
+    - `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`
+    - `MERCADOPAGO_WEBHOOK_SECRET` configured
+    - HTTPS enabled and enforced
+    - Production credentials stored securely
+    - No credentials committed to repository
+  </Step>
+  <Step title="Application setup">
+    - Dependencies installed with `--no-dev --optimize-autoloader`
+    - Configuration cached
+    - Routes cached
+    - Package discovery completed
+  </Step>
+  <Step title="MercadoPago configuration">
+    - Webhook URL registered in MercadoPago dashboard
+    - Webhook URL points to your HTTPS domain
+    - Webhook secret matches between MercadoPago and your `.env`
+    - Production credentials tested
+  </Step>
+</Steps>
+
+## Testing Production Deployment
+
+### 1. Verify Demo Routes Are Disabled
+
+```bash
+curl https://your-domain.com/api/mercadopago/health
+# Expected: 404 Not Found
+```
+
+### 2. Verify Webhook Is Active
+
+```bash
+curl --request POST \
+  --url https://your-domain.com/api/mercadopago/webhooks \
+  --header 'Content-Type: application/json' \
+  --data '{"type":"payment","data":{"id":"123"}}'
+# Expected: 200 or 401
+```
+
+## Troubleshooting Production Issues
+
+### Demo Routes Still Accessible
+
+```bash
+php artisan config:clear
+php artisan config:cache
+```
+
+### Webhook Returns 422
+
+Verify `MERCADOPAGO_ACCESS_TOKEN` is set and clear config cache:
+
+```bash
+php artisan config:clear
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Security Best Practices" icon="shield" href="/deployment/security">
+    Implement security measures for production
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/guides/handling-webhooks">
+    Handle webhook notifications properly
+  </Card>
+</CardGroup>

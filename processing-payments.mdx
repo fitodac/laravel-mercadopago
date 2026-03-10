@@ -1,0 +1,148 @@
+---
+title: "Processing Payments"
+description: "Process direct payments with tokenized cards and retrieve payment status"
+---
+
+Unlike preferences that redirect users to MercadoPago's checkout, direct payments allow you to process card payments within your own application using tokenized card data.
+
+## Payment flow overview
+
+<Steps>
+  <Step title="Tokenize card data">
+    Use MercadoPago's JavaScript SDK (MercadoPago.js) to securely tokenize card information in the browser.
+  </Step>
+  <Step title="Send token to your backend">
+    Your frontend sends the card token and payment details to your Laravel backend.
+  </Step>
+  <Step title="Create payment">
+    Your backend uses `PaymentService` to process the payment with MercadoPago's API.
+  </Step>
+  <Step title="Handle response">
+    Process the payment response and update your application state accordingly.
+  </Step>
+</Steps>
+
+## Creating payments
+
+```php
+<?php
+
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class MercadoPagoPaymentController
+{
+    public function store(
+        Request $request,
+        PaymentService $paymentService
+    ): JsonResponse {
+        $payload = $request->validate([
+            'transaction_amount' => ['required', 'numeric', 'min:0.01'],
+            'token' => ['required', 'string'],
+            'description' => ['required', 'string'],
+            'installments' => ['required', 'integer', 'min:1'],
+            'payment_method_id' => ['required', 'string'],
+            'payer' => ['required', 'array'],
+            'payer.email' => ['required', 'email'],
+        ]);
+
+        $payment = $paymentService->create($payload);
+
+        return response()->json($payment, 201);
+    }
+}
+```
+
+## Payment payload structure
+
+### Required fields
+
+```json
+{
+  "transaction_amount": 100.50,
+  "token": "CARD_TOKEN",
+  "description": "Payment description",
+  "installments": 1,
+  "payment_method_id": "visa",
+  "payer": {
+    "email": "buyer@example.com"
+  }
+}
+```
+
+## Payment statuses
+
+| Status | Description |
+|---|---|
+| `approved` | Payment approved and credited |
+| `pending` | Payment pending |
+| `in_process` | Payment being processed |
+| `rejected` | Payment rejected |
+| `cancelled` | Payment cancelled |
+| `refunded` | Payment refunded |
+
+## Handling payment responses
+
+### Success scenario
+
+```php
+if (data_get($payment, 'status') === 'approved') {
+    Order::where('id', $orderId)->update([
+        'payment_id' => data_get($payment, 'id'),
+        'status' => 'paid',
+    ]);
+}
+```
+
+### Rejection scenario
+
+```php
+if (data_get($payment, 'status') === 'rejected') {
+    $detail = data_get($payment, 'status_detail');
+    
+    return response()->json([
+        'success' => false,
+        'reason' => $detail,
+    ], 422);
+}
+```
+
+<Warning>
+  Never rely solely on the immediate payment response. Always implement webhook handling for definitive payment status updates.
+</Warning>
+
+## Frontend integration notes
+
+This package handles backend payment processing. For frontend card tokenization, you'll need to integrate MercadoPago.js separately.
+
+```javascript
+// 1. Initialize MercadoPago.js
+const mp = new MercadoPago('YOUR_PUBLIC_KEY');
+
+// 2. Create card token
+const cardToken = await mp.createCardToken({
+    cardNumber: '4509 9536 9623 3704',
+    cardholderName: 'ADA LOVELACE',
+    cardExpirationMonth: '12',
+    cardExpirationYear: '2028',
+    securityCode: '123',
+});
+
+// 3. Send token to backend
+await fetch('/checkout/payment', {
+    method: 'POST',
+    body: JSON.stringify({ token: cardToken.id, ... })
+});
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+    Process payment status notifications
+  </Card>
+  <Card title="Refunds" icon="rotate-left" href="/guides/refunds">
+    Learn how to refund payments
+  </Card>
+</CardGroup>
