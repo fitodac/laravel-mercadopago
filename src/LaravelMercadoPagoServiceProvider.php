@@ -26,7 +26,9 @@ final class LaravelMercadoPagoServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/mercadopago.php', 'mercadopago');
 
-        $this->app->bind(CredentialResolverInterface::class, EnvCredentialResolver::class);
+        $resolverClass = (string) config('mercadopago.credential_resolver', EnvCredentialResolver::class);
+
+        $this->app->bind(CredentialResolverInterface::class, $resolverClass);
         $this->app->singleton(MercadoPagoClientFactory::class);
         $this->app->singleton(SdkHttpClient::class);
         $this->app->singleton(PaymentMethodService::class);

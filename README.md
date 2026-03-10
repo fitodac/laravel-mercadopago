@@ -116,6 +116,14 @@ MERCADOPAGO_ENABLE_DEMO_ROUTES=true
 MERCADOPAGO_RUNTIME_ENVIRONMENT=
 ```
 
+También podés indicar una clase propia para resolver credenciales:
+
+```php
+'credential_resolver' => App\Support\MercadoPago\StoreCredentialResolver::class,
+```
+
+Esa clase debe implementar `Fitodac\LaravelMercadoPago\Contracts\CredentialResolverInterface`. Con eso el paquete puede seguir usando variables de entorno para un solo comercio o resolver claves desde base de datos para escenarios multi-store.
+
 ### Qué hace cada variable
 
 | Variable                          | Requerida                          | Descripción                                                                                                  |
