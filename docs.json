@@ -2,11 +2,6 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Laravel MercadoPago",
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "favicon": "/favicon.svg",
   "colors": {
     "primary": "#009EE3",
     "light": "#47C6FF",
@@ -29,7 +24,7 @@
     },
     {
       "name": "API Reference",
-      "url": "/api/preference-service"
+      "url": "/preference-service"
     }
   ],
   "navigation": [
@@ -44,35 +39,35 @@
     {
       "group": "Core Concepts",
       "pages": [
-        "concepts/architecture",
-        "concepts/services",
-        "concepts/credentials"
+        "architecture",
+        "services",
+        "credentials"
       ]
     },
     {
       "group": "Guides",
       "pages": [
-        "guides/quickstart",
-        "guides/creating-preferences",
-        "guides/processing-payments",
-        "guides/handling-webhooks",
-        "guides/managing-customers",
-        "guides/refunds",
-        "guides/testing"
+        "quickstart",
+        "creating-preferences",
+        "processing-payments",
+        "handling-webhooks",
+        "managing-customers",
+        "refunds",
+        "testing"
       ]
     },
     {
       "group": "Deployment",
       "pages": [
-        "deployment/production",
-        "deployment/security"
+        "production",
+        "security"
       ]
     },
     {
       "group": "Troubleshooting",
       "pages": [
-        "troubleshooting/common-issues",
-        "troubleshooting/debugging"
+        "common-issues",
+        "debugging"
       ]
     }
   ],
