@@ -58,7 +58,8 @@ MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
 - Card tokenization in the browser
 - Frontend validation of card details
 - Checkout Pro initialization
-  </ParamField>
+
+</ParamField>
 
 <ParamField path="webhook_secret" type="string">
   Secret used to validate webhook HMAC signatures for enhanced security.
@@ -232,61 +233,103 @@ $config = config('mercadopago');
 
 <Tabs>
   <Tab title="Local Development">
-    ```ini .env APP_ENV=local # Use test credentials
+    ```ini .env
+    # Use test credentials
     MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
     MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
-    MERCADOPAGO_WEBHOOK_SECRET=test-webhook-secret # Enable demo routes for
-    testing MERCADOPAGO_ENABLE_DEMO_ROUTES=true # Default route prefix
-    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago # Auto-detects to 'local' runtime #
-    MERCADOPAGO_RUNTIME_ENVIRONMENT not needed ``` **Configuration summary**: -
-    Demo routes are accessible at `/api/mercadopago/*` - Webhook validation is
-    enabled with test secret - SDK automatically uses `local` runtime mode -
-    Health check available at `/api/mercadopago/health`
+    MERCADOPAGO_WEBHOOK_SECRET=test-webhook-secret
+    
+    # Enable demo routes for testing
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    
+    # Default route prefix
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    
+    # Auto-detects to 'local' runtime
+    # MERCADOPAGO_RUNTIME_ENVIRONMENT not needed
+    ```
+    
+    **Configuration summary**:
+    - Demo routes are accessible at `/api/mercadopago/*`
+    - Webhook validation is enabled with test secret
+    - SDK automatically uses `local` runtime mode
+    - Health check available at `/api/mercadopago/health`
   </Tab>
 
   <Tab title="Production">
-    ```ini .env APP_ENV=production # Use production credentials
+    ```ini .env
+    # Use production credentials
     MERCADOPAGO_ACCESS_TOKEN=APP_USR-1234567890123456-123456-abc123def456
-    MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890 #
-    Required for webhook security
-    MERCADOPAGO_WEBHOOK_SECRET=your-production-webhook-secret # Explicitly
-    disable demo routes (also disabled automatically)
-    MERCADOPAGO_ENABLE_DEMO_ROUTES=false # Production route prefix
-    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago # Auto-detects to 'server' runtime
-    # MERCADOPAGO_RUNTIME_ENVIRONMENT not needed ``` **Configuration summary**:
-    - Demo routes are disabled (enforced by package) - Webhook endpoint at
-    `/api/mercadopago/webhooks` with signature validation - SDK uses `server`
-    runtime mode - Only webhook route is publicly accessible
+    MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    
+    # Required for webhook security
+    MERCADOPAGO_WEBHOOK_SECRET=your-production-webhook-secret
+    
+    # Explicitly disable demo routes (also disabled automatically)
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    
+    # Production route prefix
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    
+    # Auto-detects to 'server' runtime
+    # MERCADOPAGO_RUNTIME_ENVIRONMENT not needed
+    ```
+    
+    **Configuration summary**:
+    - Demo routes are disabled (enforced by package)
+    - Webhook endpoint at `/api/mercadopago/webhooks` with signature validation
+    - SDK uses `server` runtime mode
+    - Only webhook route is publicly accessible
+    
     <Warning>
       Always use HTTPS in production. Mercado Pago requires secure webhook URLs.
     </Warning>
   </Tab>
 
   <Tab title="Testing/CI">
-    ```ini .env APP_ENV=testing # Use test credentials
+    ```ini .env
+    # Use test credentials
     MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
-    MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890 # Optional
-    for automated tests MERCADOPAGO_WEBHOOK_SECRET= # Enable demo routes for
-    integration tests MERCADOPAGO_ENABLE_DEMO_ROUTES=true
-    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago # Auto-detects to 'local' runtime #
-    MERCADOPAGO_RUNTIME_ENVIRONMENT not needed ``` **Configuration summary**: -
-    Demo routes are accessible for integration tests - Webhook validation is
-    optional (useful for testing) - SDK uses `local` runtime mode - Test
-    credentials prevent real charges
+    MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    
+    # Optional for automated tests
+    MERCADOPAGO_WEBHOOK_SECRET=
+    
+    # Enable demo routes for integration tests
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    
+    # Auto-detects to 'local' runtime
+    # MERCADOPAGO_RUNTIME_ENVIRONMENT not needed
+    ```
+    
+    **Configuration summary**:
+    - Demo routes are accessible for integration tests
+    - Webhook validation is optional (useful for testing)
+    - SDK uses `local` runtime mode
+    - Test credentials prevent real charges
   </Tab>
 
   <Tab title="Staging">
-    ```ini .env APP_ENV=staging # Use test credentials or production credentials
-    depending on needs
+    ```ini .env
+    # Use test credentials or production credentials depending on needs
     MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
     MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
-    MERCADOPAGO_WEBHOOK_SECRET=staging-webhook-secret # Disable demo routes
-    (production-like) MERCADOPAGO_ENABLE_DEMO_ROUTES=false
-    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago # Use server runtime for
-    production-like behavior MERCADOPAGO_RUNTIME_ENVIRONMENT=server ```
-    **Configuration summary**: - Production-like configuration for
-    pre-deployment testing - Demo routes disabled - Webhook validation enabled -
-    Server runtime mode for accurate testing
+    MERCADOPAGO_WEBHOOK_SECRET=staging-webhook-secret
+    
+    # Disable demo routes (production-like)
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    
+    # Use server runtime for production-like behavior
+    MERCADOPAGO_RUNTIME_ENVIRONMENT=server
+    ```
+    
+    **Configuration summary**:
+    - Production-like configuration for pre-deployment testing
+    - Demo routes disabled
+    - Webhook validation enabled
+    - Server runtime mode for accurate testing
   </Tab>
 </Tabs>
 

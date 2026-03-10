@@ -1,0 +1,91 @@
+---
+title: "Webhooks API"
+description: "Punto central neurálgico que ingiere y decodifica las ráfagas y mensajes del gateway global."
+icon: "webhook"
+---
+
+## Naturaleza del Engranaje
+
+El Endpoint API Webhooks no emite nada, a diferencia de los de Customers o Preferences. Su única finalidad reside en recibir en silencio absolutos llamadas en ráfagas de POSTs constantes por parte de la IP pública y enrutada de `Mercado Pago (Server)` que notifican e informan respecto de actualizaciones pasadas respecto del Status actual de una Boleta generada a nombre de ellos.
+
+<Info>
+  El Webhook oficial y pre-puesto del paquete funciona perpetuamente. Ignorará la regla pasiva de "demostración" y jamás emitirá error 404 en ambientes Productivos (`APP_ENV=production`). No hace magia, está blindado per se y su necesidad es de supervivencia total para no acorralar un ecommerce y regalar plata o estafar transeuntes ante status caídos de bancos.
+</Info>
+
+## Caza de Alertas Webhooks
+
+Punto de impacto pasivo de Mercado Pago.
+
+### Endpoint Base Físico
+
+```text
+POST /api/mercadopago/webhooks
+```
+
+### Cabeceras de Autoridad e Integridad (Request Headers)
+
+<ParamField header="x-signature" type="string">
+  Es un algoritmo criptográfico HMAC. `ts={horaunix},v1={cifradoresuelto}`
+  <Note>
+    Requerido incondicionalmente para auditar al Mensajero únicamente si optaste por cargar a tu archivo maestro una llave privada `MERCADOPAGO_WEBHOOK_SECRET`.
+  </Note>
+</ParamField>
+
+<ParamField header="x-request-id" type="string">
+  La IP unívoca y huella autogenerada del llamado web a fin de esquivar inyecciones replay-attack de un ciberatacante malicioso.
+</ParamField>
+
+### Espectro Central de Parámetros
+
+<ParamField query="topic" type="string">
+  La vertiente (Por lo general dice `payment` frente a transacciones aisladas o `merchant_order` frente a carritos masivos inmensos).
+</ParamField>
+
+<ParamField path="action" type="string">
+  El estado actual de transición (`payment.created`, `payment.updated`).
+</ParamField>
+
+<ParamField path="data.id" type="string">
+  La Estampa de Identidad del ticket referenciado original sobre el cual orbitan y giran las noticias y la alerta global.
+</ParamField>
+
+### Objeto Refinado Final Creado (Respuesta Auditada)
+
+Una vez que cruza el portal seguro y descarta espammers y bots inyectores externos de la red pública e Internet; nuestro software re-codifica los diccionarios, y lo entrega como esto:
+
+<ResponseField name="data" type="object">
+  Alianza Limpia Final
+  <Expandable title="Resolución Absoluta">
+    <ResponseField name="acknowledged" type="boolean">
+      Avisa de manera amena que no estalló nada.
+    </ResponseField>
+
+    <ResponseField name="validated" type="boolean">
+      Te grita fuerte si el sistema corrio exitosamente la suma aritmética de validación de firma y corroboró fidedignidad de autor en su trayecto desde Mercado Pago o si simplemente no tenés instanciado el Secret en tu `.env` (Peligroso).
+    </ResponseField>
+
+    <ResponseField name="topic" type="string">
+      Retorno centralizado (`payment` o `subscription` recurrentes, etc.).
+    </ResponseField>
+
+    <ResponseField name="resource" type="string">
+      La estampita gigantesca o ID diminuto del ticket que debés agarrar y enviar urgente en otra llamada `GET` al servicio de `PaymentService` para interrogar por la verdad final (`status => approved`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Validación Criptográfica en Detalles
+
+Cuando configures la perilla de `MERCADOPAGO_WEBHOOK_SECRET`, el sistema hará las paces contra los ataques DDOS e inyecciones:
+
+1. El sistema devora en las sombras la meta-header `x-signature` del Request Oficial que ingresa a Nginx/Apache2.
+2. Rompe y digiere tu `x-request-id` oficial.
+3. Lee el ID expuesto por Mercado Pago de su recurso.
+4. Genera una fusión bruta (`id={id}&request-id={request-id}&ts={ts}`).
+5. Se clona un modelo simétrico `HMAC-SHA256` inyectándole al motor la variable pesada proveída desde tu archivo de variables locales (.env).
+6. Se superpone un `match` comparativo contra el V1 firmado.
+7. Se da visto bueno, asintiendo la naturalidad de la proveniencia del POST.
+
+<Warning>
+  **Exigencia Absoluta para el despliegue final en la Web**: Se recomienda bajo todo punto de vista, inclusive ético, que en Live (Production/Web Abierta) nunca, pero jamás en ninguna de sus facetas utilices tus APIs web financieras de recepción para captación de cobros ajenos o propios destituyendo u evadiendo variables como `MERCADOPAGO_WEBHOOK_SECRET` que no encriptan verdaderamente el trayecto final de tus paquetes.
+</Warning>

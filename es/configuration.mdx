@@ -1,0 +1,335 @@
+---
+title: Configuración
+description: Configurá Laravel MercadoPago con variables de entorno, publicá el archivo de configuración y entendé todas las opciones disponibles.
+---
+
+## Publicar la configuración
+
+Si bien el paquete funciona solo con variables de entorno, podés publicar opcionalmente el archivo de configuración para una personalización avanzada.
+
+```bash
+php artisan vendor:publish --tag=mercadopago-config
+```
+
+Esto crea `config/mercadopago.php` en tu aplicación Laravel.
+
+## Variables de entorno
+
+Todas las opciones de configuración se pueden definir mediante variables de entorno en tu archivo `.env`.
+
+### Configuración requerida
+
+<ParamField path="MERCADOPAGO_ACCESS_TOKEN" type="string" required>
+  Tu access token de Mercado Pago. El SDK lo usa para autenticar las solicitudes a la API.
+  
+  **Dónde encontrarlo**: Panel de Mercado Pago → Tus integraciones → Credenciales
+
+  ```ini .env
+  MERCADOPAGO_ACCESS_TOKEN=APP_USR-1234567890123456-123456-abc123def456ghi789jkl012mno345-123456789
+  ```
+</ParamField>
+
+<Warning>
+  Sin un `MERCADOPAGO_ACCESS_TOKEN` válido, los servicios del paquete lanzarán una
+  excepción de configuración cuando intenten hacer llamadas a la API.
+</Warning>
+
+### Configuración opcional
+
+<ParamField path="MERCADOPAGO_PUBLIC_KEY" type="string">
+  Tu clave pública de Mercado Pago. Se usa para integraciones frontend como la tokenización de tarjetas.
+
+  ```ini .env
+  MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+  ```
+</ParamField>
+
+<ParamField path="MERCADOPAGO_WEBHOOK_SECRET" type="string">
+  Secreto para validar las firmas HMAC de los webhooks. **Altamente recomendado en producción**.
+  
+  Cuando está configurado, el endpoint de webhook valida el header `x-signature` para asegurarse de que las notificaciones son auténticas.
+
+  ```ini .env
+  MERCADOPAGO_WEBHOOK_SECRET=your-webhook-secret-from-mercadopago
+  ```
+
+  <Note>
+    Si no está configurado, los webhooks se aceptan sin validación de firma
+    (`validated: false` en la respuesta).
+  </Note>
+</ParamField>
+
+<ParamField path="MERCADOPAGO_ROUTE_PREFIX" type="string" default="api/mercadopago">
+  Prefijo para todas las rutas registradas (webhook y endpoints demo).
+
+  ```ini .env
+  MERCADOPAGO_ROUTE_PREFIX=api/payments
+  ```
+
+  Genera rutas como:
+  - `POST /api/payments/webhooks`
+  - `GET /api/payments/health`
+</ParamField>
+
+<ParamField path="MERCADOPAGO_ENABLE_DEMO_ROUTES" type="boolean" default="true">
+  Habilitá o deshabilitá las rutas demo. Las rutas demo siempre están deshabilitadas en producción independientemente de este valor.
+
+  ```ini .env
+  MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+  ```
+
+  Las rutas demo solo responden cuando:
+  - Esto está en `true` **Y**
+  - `APP_ENV` es `local` o `testing`
+</ParamField>
+
+<ParamField path="MERCADOPAGO_RUNTIME_ENVIRONMENT" type="string">
+  Fuerza el entorno de ejecución del SDK de Mercado Pago. Si no se define, el paquete usa automáticamente:
+  - `local` cuando `APP_ENV` es `local` o `testing`
+  - `server` en todos los demás entornos
+
+  ```ini .env
+  MERCADOPAGO_RUNTIME_ENVIRONMENT=server
+  ```
+</ParamField>
+
+## Estructura del archivo de configuración
+
+El archivo `config/mercadopago.php` publicado tiene esta forma:
+
+```php config/mercadopago.php
+<?php
+
+declare(strict_types=1);
+
+return [
+    'access_token'        => env('MERCADOPAGO_ACCESS_TOKEN'),
+    'public_key'          => env('MERCADOPAGO_PUBLIC_KEY'),
+    'webhook_secret'      => env('MERCADOPAGO_WEBHOOK_SECRET'),
+    'route_prefix'        => env('MERCADOPAGO_ROUTE_PREFIX', 'api/mercadopago'),
+    'enable_demo_routes'  => (bool) env('MERCADOPAGO_ENABLE_DEMO_ROUTES', true),
+    'runtime_environment' => env('MERCADOPAGO_RUNTIME_ENVIRONMENT'),
+];
+```
+
+Podés acceder a estos valores en tu aplicación:
+
+```php
+config('mercadopago.access_token')
+config('mercadopago.route_prefix')
+config('mercadopago.enable_demo_routes')
+```
+
+## Ejemplos de configuración
+
+<Tabs>
+  <Tab title="Desarrollo local">
+    ```ini .env
+    APP_ENV=local
+    MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
+    MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    MERCADOPAGO_WEBHOOK_SECRET=test-webhook-secret
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    ```
+
+    - Las rutas demo son accesibles
+    - La validación del webhook está habilitada
+    - El SDK usa el runtime `local` automáticamente
+  </Tab>
+
+  <Tab title="Producción">
+    ```ini .env
+    APP_ENV=production
+    MERCADOPAGO_ACCESS_TOKEN=APP_USR-1234567890123456-123456-abc123def456
+    MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    MERCADOPAGO_WEBHOOK_SECRET=your-production-webhook-secret
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    ```
+
+    - Las rutas demo están deshabilitadas
+    - Se requiere la validación de firma del webhook
+    - El SDK usa el runtime `server` automáticamente
+  </Tab>
+
+  <Tab title="Testing">
+    ```ini .env
+    APP_ENV=testing
+    MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
+    MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
+    MERCADOPAGO_WEBHOOK_SECRET=
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    ```
+
+    - Las rutas demo son accesibles
+    - La validación del webhook es opcional (útil para testing)
+    - El SDK usa el runtime `local` automáticamente
+  </Tab>
+</Tabs>
+
+## Tabla de referencia de configuración
+
+| Variable                          | Requerida       | Por defecto       | Descripción                                      |
+| --------------------------------- | --------------- | ----------------- | ------------------------------------------------ |
+| `MERCADOPAGO_ACCESS_TOKEN`        | **Sí**          | —                 | Token de autenticación del SDK para llamadas API |
+| `MERCADOPAGO_PUBLIC_KEY`          | No              | —                 | Clave pública para integraciones frontend        |
+| `MERCADOPAGO_WEBHOOK_SECRET`      | **Recomendada** | —                 | Secreto para validar firmas de webhook           |
+| `MERCADOPAGO_ROUTE_PREFIX`        | No              | `api/mercadopago` | Prefijo para todas las rutas registradas         |
+| `MERCADOPAGO_ENABLE_DEMO_ROUTES`  | No              | `true`            | Habilitá rutas demo (solo funciona en local/testing) |
+| `MERCADOPAGO_RUNTIME_ENVIRONMENT` | No              | Auto-detectado    | Fuerza el runtime del SDK: `local` o `server`   |
+
+## Verificar la configuración
+
+Después de configurar el paquete, verificá tu setup usando el endpoint de health check:
+
+<Steps>
+  <Step title="Limpiá el caché de configuración">
+    Si tenés el caché de configuración activo, limpialo para que tome los nuevos valores:
+
+    ```bash
+    php artisan config:clear
+    ```
+  </Step>
+
+  <Step title="Probá el endpoint de health">
+    El endpoint de health está disponible cuando las rutas demo están habilitadas:
+
+    ```bash
+    curl http://localhost:8000/api/mercadopago/health
+    ```
+
+    Respuesta esperada:
+
+    ```json
+    {
+        "ok": true,
+        "data": {
+            "configured": true,
+            "has_public_key": true,
+            "has_webhook_secret": true,
+            "environment": "local"
+        },
+        "meta": []
+    }
+    ```
+  </Step>
+
+  <Step title="Verificá el registro de rutas">
+    ```bash
+    php artisan route:list --name=mercadopago
+    ```
+
+    Confirmá que las rutas usen tu prefijo configurado.
+  </Step>
+</Steps>
+
+## Buenas prácticas de seguridad
+
+<Warning>
+  **Nunca commiteés credenciales al control de versiones.** Siempre usá variables
+  de entorno y mantené `.env` en tu `.gitignore`.
+</Warning>
+
+### En desarrollo
+
+- Usá credenciales de prueba de los usuarios de test de Mercado Pago
+- Mantené `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` para facilitar el testing
+- El webhook secret es opcional pero recomendado
+
+### En producción
+
+<Steps>
+  <Step title="Usá credenciales de producción">
+    Reemplazá todas las credenciales de prueba con access tokens y claves públicas de producción
+    de tu cuenta de Mercado Pago.
+  </Step>
+
+  <Step title="Configurá el webhook secret">
+    Siempre definí `MERCADOPAGO_WEBHOOK_SECRET` para validar las notificaciones entrantes.
+
+    ```ini .env
+    MERCADOPAGO_WEBHOOK_SECRET=your-production-secret
+    ```
+  </Step>
+
+  <Step title="Deshabilitá las rutas demo">
+    Deshabilitá explícitamente las rutas demo en producción:
+
+    ```ini .env
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    ```
+
+    Incluso si se dejan habilitadas, no responderán en entornos de producción.
+  </Step>
+
+  <Step title="Usá HTTPS">
+    Asegurate de que tu endpoint de webhook sea accesible via HTTPS. Mercado Pago requiere
+    URLs seguras para los webhooks.
+  </Step>
+
+  <Step title="Cacheá la configuración">
+    En producción, cacheá tu configuración para mejor rendimiento:
+
+    ```bash
+    php artisan config:cache
+    ```
+  </Step>
+</Steps>
+
+## Solución de problemas
+
+### "Mercado Pago access token is not configured"
+
+**Solución**: Definí `MERCADOPAGO_ACCESS_TOKEN` y limpiá la caché de config:
+
+```bash
+php artisan config:clear
+```
+
+### Las rutas demo devuelven 404
+
+**Causas**:
+
+1. `MERCADOPAGO_ENABLE_DEMO_ROUTES` no está en `true`
+2. `APP_ENV` no es `local` ni `testing`
+3. Las rutas están cacheadas sin el middleware
+
+**Solución**:
+
+```bash
+php artisan route:clear
+php artisan config:clear
+```
+
+### El webhook devuelve 401 Unauthorized
+
+**Causa**: La validación de firma HMAC está fallando.
+
+**Verificá**:
+
+- `MERCADOPAGO_WEBHOOK_SECRET` coincide con el secreto configurado en el panel de Mercado Pago
+- La solicitud incluye los headers `x-signature` y `x-request-id`
+- El parámetro `data.id` está presente en el query string o en el payload
+
+### Los cambios de configuración no toman efecto
+
+**Solución**: Limpiá y recacheá la configuración:
+
+```bash
+php artisan config:clear
+php artisan config:cache
+```
+
+## Próximos pasos
+
+<CardGroup cols={2}>
+  <Card title="Usando servicios" icon="code" href="/es/concepts/services">
+    Aprendé a inyectar y usar los servicios del paquete en tu aplicación
+  </Card>
+
+  <Card title="Endpoints demo" icon="route" href="/es/api/endpoints/preferences">
+    Explorá el webhook y las rutas demo registradas por el paquete
+  </Card>
+</CardGroup>

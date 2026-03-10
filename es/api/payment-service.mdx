@@ -1,0 +1,107 @@
+---
+title: "PaymentService"
+description: "Servicio encargado de facturar inmediatamente cobros transparentes sin Checkouts Externos."
+icon: "credit-card"
+---
+
+## Descripción
+
+El bloque arquitectónico de `PaymentService` digiere y lanza peticiones crudas hacia la SDK usando datos tokenizados que tu propio frontend acopió o las tarjetas que tenías guardadas perpetuamente amarradas usando la llave de `customer_id`.
+
+**Resolución**: `src/Services/PaymentService.php:9`
+
+## Métodos Críticos
+
+### create()
+
+Engendra y envía el Cobro Total.
+
+```php
+public function create(array $payload): mixed
+```
+
+#### Parámetros
+
+<ParamField path="payload" type="array" required>
+  Array vital y estricta:
+  <Expandable title="Ojeada al Payload">
+    <ParamField path="transaction_amount" type="numeric" required>
+      La plata a descontar o facturar. (Siempre float o number > 0.00).
+    </ParamField>
+
+    <ParamField path="token" type="string" required>
+      Token provisto por Javascript o equivalente extraido encriptado desde MercadoPago a tu DOM.
+    </ParamField>
+
+    <ParamField path="installments" type="integer" required>
+      Cuotas a someter el débito. Si es al contado (Obligatoriamente envías un 1).
+    </ParamField>
+
+    <ParamField path="payment_method_id" type="string" required>
+      Cadena obligatoria: "visa", "master", "amex", "debcabal".
+    </ParamField>
+
+    <ParamField path="payer.email" type="string" required>
+      El cliente que paga debe declarar correo activo.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Modos de Falla
+
+<CodeGroup>
+```php Absorbiendo respuestas de manera defensiva
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+try {
+    $pago = app(PaymentService::class)->create([
+        'transaction_amount' => 250.00,
+        'token' => $cardTokenDesdeElFrontendOBaseDeDatos,
+        'description' => 'Pedido #1234 En Local',
+        'installments' => 1,
+        'payment_method_id' => 'master',
+        'payer' => [
+            'email' => 'juanma@example.com',
+        ],
+    ]);
+
+    // Abordando según respuesta devuelta
+    match (data_get($pago, 'status')) {
+        'approved' => $this->aprobar($pago),
+        'rejected' => $this->denegarCompraYVer($pago),
+        'in_process' => $this->pedirleQueEspereConfirmacionEmail($pago),
+    };
+
+} catch (\Exception $e) {
+    \Log::error('Se desincronizó o crasheo', [$e->getMessage()]);
+}
+```
+</CodeGroup>
+
+### get()
+
+Una utilidad vital para escudriñar mediante número de recibo qué tan legítima es una operación, o su progreso temporal a día de hoy. 
+
+```php
+public function get(string $paymentId): mixed
+```
+
+#### Retornos
+<ResponseField name="response" type="mixed">
+  Devuelve un clon generalizado del mismo formato de objeto MP al momento de llamar a create(); Con todo su status fresco (Ej: `status => "approved"`).
+</ResponseField>
+
+#### Uso en la red Interna
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+// Obtenemos la boleta.
+$facturaFisicaVirtual = app(PaymentService::class)->get('123456789');
+
+if (data_get($facturaFisicaVirtual, 'status') === 'approved') {
+    auth()->user()->orders()
+        ->where('mp_payment_id', $facturaFisicaVirtual->id)
+        ->update(['pagado' => true]);
+}
+```

@@ -1,0 +1,151 @@
+---
+title: "PreferenceService"
+description: "Referencia API para elaborar preferencias de pago (Checkout Pro)."
+icon: "file-invoice"
+---
+
+## Resumen
+
+La clase `PreferenceService` maneja todo el andamiaje para armar pagos delegados mediante checkout gráfico en MP. Permiten definir el carrito de compras a cobrar y a su vez establecen atajos de retorno de éxito para tu cliente.
+
+**Ubicación de archivo**: `src/Services/PreferenceService.php:9`
+
+## Constructor
+
+```php
+public function __construct(
+    private MercadoPagoClientFactory $clientFactory,
+) {}
+```
+
+### Dependencias
+
+<ParamField path="clientFactory" type="MercadoPagoClientFactory" required>
+  La factoría maestra constructora. Inyectada sola al vuelo mediante el Auto-resolution del Service Container de Laravel.
+</ParamField>
+
+## Métodos
+
+### create()
+
+Construye una preferencia lista para usar en MercadoPago.
+
+```php
+public function create(array $payload): mixed
+```
+
+#### Parámetros Principales
+
+<ParamField path="payload" type="array" required>
+  Toda la configuración y data en crudo.
+  <Expandable title="Estructura del Payload Analizada">
+    <ParamField path="items" type="array" required>
+      Diccionario Multidimensional del Carrito.
+      - `title` (string, obligatorio): Nombre o título del ítem
+      - `quantity` (integer, obligatorio): Cuántos pedís
+      - `unit_price` (numeric, obligatorio): El monto cobrable por ítem aislado
+      - `currency_id` (string, opcional): Default a moneda local del vendedor
+      - `description` (string, opcional): Metadata extensa para adornarlo
+    </ParamField>
+
+    <ParamField path="payer" type="array">
+      El comprador (Cliente Humano/Jurídico): 
+      - `email` (string): Correo 
+      - `name` (string): Nombre real
+      - `surname` (string): Apellidos
+      - `phone` (array): Teléfono formateado
+      - `address` (array): Calles de despacho material
+    </ParamField>
+
+    <ParamField path="back_urls" type="array">
+      Las ubicaciones web de retroceso desde el Checkout Finalizado de MP hacia Tu Sistema: 
+      - `success` (string): Ganaste
+      - `pending` (string): En Veremos financiero
+      - `failure` (string): Perdiste la venta (se arrepintió o no tiene saldo)
+    </ParamField>
+
+    <ParamField path="notification_url" type="string">
+      Webhook exclusivo para vigilar el comportamiento de este carrito en la sombra.
+    </ParamField>
+
+    <ParamField path="external_reference" type="string">
+      Nomenclatura propia (Atalo a los ID de `pedidos` en tu DB SQL).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Valores de Devolución
+
+<ResponseField name="response" type="mixed">
+  Diccionario puro conteniendo:
+  <Expandable title="Estructura general">
+    <ResponseField name="id" type="string">
+      La estampa identificatoria que debés usar para invocar u atar tu pago (String alfanumerico gigante).
+    </ResponseField>
+
+    <ResponseField name="init_point" type="string">
+      Ruta que debés forzar a recargar al Browser del Comprador usando Modo Producción real con dinero.
+    </ResponseField>
+
+    <ResponseField name="sandbox_init_point" type="string">
+      Ídem anterior pero usa los perfiles virtuales y saldos de mentira de los Modos Pruebas.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Uso en la Práctica Cotidiana
+
+<CodeGroup>
+```php Mediante Inyección
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class GeneradorController
+{
+    public function store(Request $r, PreferenceService $service): JsonResponse 
+    {
+        $compra = $service->create([
+            'items' => [
+                ['title' => 'Producto', 'quantity' => 1, 'unit_price' => 5000],
+            ],
+            'back_urls' => [
+                'success' => route('compras.exito'),
+                'pending' => route('compras.suspenso'),
+                'failure' => route('compras.falla'),
+            ],
+            'notification_url' => route('mercadopago.webhooks'),
+            'external_reference' => 'NUEVO-10',
+        ]);
+
+        return response()->json([
+            'preference_id' => data_get($compra, 'id'),
+            'checkout_url' => data_get($compra, 'init_point'),
+        ]);
+    }
+}
+```
+
+```php Peticionando un resolve() plano
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+
+$engine = app(PreferenceService::class);
+$pref = $engine->create(['items' => [/* ... */]]);
+```
+</CodeGroup>
+
+## Jerarquía de Ruptura (Try/Catch)
+
+Las caídas te devolverán Excepciones nativas o controladas.
+
+<ResponseField name="MercadoPagoConfigurationException" type="exception">
+  Saltará prematuramente si: 
+  - El ambiente (SDK) base de Mercadopago ni siquiera logró cargarse vía Composer.
+  - Omitiste instalar las API Keys/Tokens.
+</ResponseField>
+
+<ResponseField name="MercadoPagoException" type="exception">
+  Lo lanzarán post-request desde el mismísimo Mercado Pago por: 
+  - Llave revocada o vencida.
+  - Carrito asmétrico o carente de precio positivo (> 0)
+</ResponseField>

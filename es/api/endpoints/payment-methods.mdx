@@ -1,0 +1,85 @@
+---
+title: "Payment Methods API"
+description: "Ruta simple tipo GET para traer la colección permitida de Tarjetas a tu Frontend"
+icon: "credit-card-blank"
+---
+
+## Visión Funcional
+
+La Meta de `Payment Methods API` es arrojar un catálogo inmenso lleno de todos los bancos, franquicias y métodos offlines que tu usuario configuró en MP a la hora de crearse la cuenta y loguearse en su Panel.
+
+<Warning>
+  Desactivado incondicionalmente al setear Modo Producción. Funciona sólo como atajo velóz para Frontend Developers en ambientes cerrados al emular llamadas de red locales.
+</Warning>
+
+## Bajar Lista (`GET`)
+
+Simplemente hace fetch y barre los registros.
+
+### Endpoint
+
+```
+GET /api/mercadopago/payment-methods
+```
+
+### Respuesta del Arbol
+
+<ResponseField name="data" type="array">
+  Mazo de diccionarios con banderas
+  <Expandable title="Propiedades más destacadas a usar en HTML">
+    <ResponseField name="id" type="string">
+      Bandera cruda: (`visa`, `master`, `amex`).
+    </ResponseField>
+
+    <ResponseField name="name" type="string">
+      Nombre visual listo para tu etiqueta Dropdown: `Tarjeta Visa Débito`.
+    </ResponseField>
+
+    <ResponseField name="payment_type_id" type="string">
+      La raza de la moneda: `credit_card`, `debit_card`, `ticket` (cajas de cobros de efectivo).
+    </ResponseField>
+
+    <ResponseField name="secure_thumbnail" type="string">
+      Link HTTPs embebido a tu disposición de Mercado Libre S.A para que renderizes el logo del banco automáticamente (Ej: Naranja, Cencosud).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Llamado de Prueba
+
+```bash
+curl --request GET \
+  --url http://localhost:8000/api/mercadopago/payment-methods
+```
+
+## Reglas de Implementación
+
+Las rutas de Frontend ReactJS deberían atrapar silenciosamente tras armar la caché esta ruta y pintar las opciones:
+
+```javascript
+fetch("/api/mercadopago/payment-methods")
+  .then((response) => response.json())
+  .then((result) => {
+    if (result.ok) {
+      // Ocultarle al Frontend los débitos, solo queremos robarles cuotas de crédito por ejemplo en esta pantalla.
+      const creditCardsLocales = result.data.filter(
+        (method) => method.payment_type_id === "credit_card"
+      );
+
+      // Le pegás un Map a React y pintás en el select.
+    }
+  });
+```
+
+<Tip>
+  **Acaudalá estos resultados (Caché)**. Mercado Pago no va a inventar nuevos bancos en Argentina o Latam de la noche a la mañana. Podés dejar corriendo este catálogo en Redis durante 48hs sin volver a contactar a Brasil hasta que el Cache de tu Laravel estornude.
+</Tip>
+
+### Modelos y Ejemplos de Familias Bancarias en LATAM (Testing)
+
+| Bandera ID         | Descripción Formal   | País Predominante|
+| ------------------ | ---------------------| ------------------------ |
+| `credit_card`      | Créditos Generales  | Visa, Mastercard, Amex, Cabal, Cencosud   |
+| `debit_card`       | Débitos  | Maestro (debmaster), debcabal      |
+| `ticket`           | Billetes Físicos en Caja humana | Boleto (BR), OXXO (MX), Pago Fácil, Rapipago (AR). |
+| `bank_transfer`    | Clave Bancaria Uniforme     | PIX (BR), PSE (CO)           |

@@ -1,0 +1,112 @@
+---
+title: "Procesando Pagos en Transparente"
+description: "Atrapá pagos crudos directamente a la API utilizando Tarjetas Tokenizadas."
+icon: "credit-card"
+---
+
+A diferencia de las **Preferencias**, que redirigen obligatoriamente a los clientes al entorno gráfico nativo y web de Mercado Pago para procesar, el procesamiento transparente mantiene las ventanas y modalidades contenidas herméticamente bajo el dominio y maquetado de nuestra App Laravel.
+
+## Flujo integral simplificado
+
+<Steps>
+  <Step title="Tokenizar la data privada y física de las tarjetas">
+    Integrá el MercadoPago SDK V2 oficial de front-end (JavaScript). Permite que el comprador ingrese todos sus PAN (números de tarjeta) y CVV y mediante una llamada directa y sin escalas se encripte y nos devuelva un simple Token efímero y anónimo.
+  </Step>
+
+  <Step title="Despacho general al Backend">
+    Hacé un fetch mediante axios/fetch con tu Token e información miscelánea hacia tus rutas locales de Laravel.
+  </Step>
+
+  <Step title="Fallo u Acreditación Central">
+    Usá el inyector fundamental `PaymentService` y devolvé con naturalidad asíncrona la resolución al DOM del usuario en pantalla.
+  </Step>
+</Steps>
+
+## Realizando transacciones
+
+<CodeGroup>
+```php Mediante inyección de PaymentService
+<?php
+
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+final class GeneradorCobrosTransparentes
+{
+    public function procesarPagoFinal(Request $request, PaymentService $paymentService)
+    {
+        $payload = $request->validate([
+            'transaction_amount' => ['required', 'numeric', 'min:0.01'],
+            'token' => ['required', 'string'],
+            'description' => ['required', 'string'],
+            'installments' => ['required', 'integer', 'min:1'],
+            'payment_method_id' => ['required', 'string'],
+            'payer.email' => ['required', 'email'],
+        ]);
+
+        $payment = $paymentService->create($payload);
+
+        return response()->json($payment, 201);
+    }
+}
+```
+
+```bash Demo
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/payments \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "transaction_amount": 100.50,
+    "token": "CARD_TOKEN_FRONTEND_VENCIBLE",
+    "description": "Pago final sin redirect",
+    "installments": 1,
+    "payment_method_id": "visa",
+    "payer": {
+      "email": "comprador@ejemplo.com"
+    }
+  }'
+```
+</CodeGroup>
+
+### ¿Qué se enviará mediante el Payment? (Payload final)
+
+```json
+{
+  "transaction_amount": 25000.0,
+  "token": "JS_TOKEN",
+  "description": "Zapatillas Nike Premium",
+  "installments": 3,
+  "payment_method_id": "visa",
+  "issuer_id": 310,
+  "payer": {
+    "email": "comprador@hotmail.com",
+    "identification": {
+      "type": "DNI",
+      "number": "12345678"
+    }
+  },
+  "external_reference": "MI-LOCAL-1052",
+  "notification_url": "https://mi-dominio.com/api/mercadopago/webhooks"
+}
+```
+
+## Estados de los pagos (`status` y `status_detail`)
+
+Al concretarse, la API de Mercado Pago responde con las combinatorias entre de "Status Global" y "Sentencias Analíticas / Detailed".
+
+| Estado (`status`) | Lo que significa históricamente             |
+| -------------- | ------------------------------------------- |
+| `approved`     | 🟢 Dinero extraído con éxito y depositado               |
+| `pending`      | ⏳ Evaluando / En pre-aprobación del banco / Boletas efectivo manuales|
+| `in_process`   | 🔄 Bajo lupa antifraudes interna                   |
+| `rejected`     | 🔴 Denegado irreversible                     |
+| `cancelled`    | 🚫 Cancelado a mano o se sobrepasó la fecha ventana                  |
+
+### Entendiendo la sentencia a fondo (Rechazos)
+
+Si el `status` figura en `rejected`, `status_detail` esclarecerá la variable que colapsó a la tarjeta:
+
+- `cc_rejected_bad_filled_card_number` - Tipearon mal sus 16 dígitos.
+- `cc_rejected_bad_filled_date` - Mes y año inválidos.
+- `cc_rejected_bad_filled_security_code` - Invlue CVC/CVV.
+- `cc_rejected_insufficient_amount` - Límite rebotado, saldo negativo, el plástico no cuenta con la suficiente liquidez monetaria para cubrir sus gastos propuestos.
+- `cc_rejected_high_risk` - Frenado automáticamente en la aduana de Prevención de Fraudes de MP Machine Learning.

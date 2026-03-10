@@ -1,0 +1,77 @@
+---
+title: Configuración API
+description: Referencia absoluta para las variables de entorno de Laravel MercadoPago.
+icon: gear
+---
+
+## Resumen
+
+El paquete de Laravel MercadoPago extrae y configura la autenticación hacia su SDK oficial así también como medidas de seguridad, rutas globales e infraestructura por cada requerimiento a base de archivos planos que se alimentan del Entorno.
+
+## Publicando Archivos de Configuración
+
+A pesar de que funciona perfectamente nutriéndose solo de un `.env`, en casos avanzados querrás sobreescribir la resolución a código puro editado.
+
+```bash
+php artisan vendor:publish --tag=mercadopago-config
+```
+
+Esto sembrará en tu proyecto un nuevo archivo plano `config/mercadopago.php`, en cual le delegarás la lectura profunda y el almacenamiento a caché permanente al backend.
+
+## Opciones Disponibles mediante Parámetros
+
+<ParamField path="access_token" type="string" required>
+  Token duro general de control para todas tus acciones.
+
+**Variable en Entorno**: `MERCADOPAGO_ACCESS_TOKEN`
+
+Esta variable domina al 90% del funcionamiento vital interno. Sin este código explícito, ninguna operación es apta para procesarse al SDK de origen de mercado pago arrojando una `MercadoPagoConfigurationException`.
+</ParamField>
+
+<ParamField path="public_key" type="string">
+  Se utiliza de forma general mediante integraciones cruzadas en el frontend mediante SDK Js de Checkout Pro o Tokenización rápida web.
+
+**Variable**: `MERCADOPAGO_PUBLIC_KEY`
+
+Si bien en transacciones en donde el control del lado del servidor sea 100% manual esto no afecta, la recomiendan mucho a la hora de tener sistemas híbridos de tarjeta-token local / pago API con Laravel.
+</ParamField>
+
+<ParamField path="webhook_secret" type="string">
+  Cadena alfanumeria dedicada a forzar barreras de Seguridad (Control HMAC-SHA256).
+
+**Variable**: `MERCADOPAGO_WEBHOOK_SECRET`
+
+**Altamente requerida para Ambientes de Producción**. Una vez provista en el backend, la ruta principal del Webhook no confía plenamente en ningún payload a menos de que en las cabeceras cuenten con la firma `x-signature` idéntica derivada y validable hacia este Secret propio.
+</ParamField>
+
+
+<ParamField path="route_prefix" type="string" default="api/mercadopago">
+  Prefijos automáticos que el instalador inyectará sobre nuestro proyecto host.
+
+**Variable**: `MERCADOPAGO_ROUTE_PREFIX`
+
+Un nombre representativo que no choque con lógicas de API que tuvieras operando simultáneamente. Ej: cambiarlo a `api/v1/financiero/mp`
+</ParamField>
+
+<ParamField path="enable_demo_routes" type="boolean" default="true">
+  Encendido y Apagado genérico a fines de pruebas directas en local.
+
+**Variable**: `MERCADOPAGO_ENABLE_DEMO_ROUTES`
+
+Estos atajos (endpoints) sirven al exclusivo motivo de no tener que desarrollar controladores paralelos enormes nada más que para certificar que este engranaje de servicio de pagos funcione y que devuelva status 201 válidamente elaborados. 
+
+El código fuente trae inscripto **mecanismos de protección anti producción**. Así que inclusive si descuidas esta flag como TRUE, un entorno laravelizado de modo `production` cortará los retornos de las rutas DEMO inmediatamente con 404s.
+</ParamField>
+
+
+<ParamField path="runtime_environment" type="string|null">
+  Se apodera de la definición natural forzandole al entorno SDK modos pre-fijados analíticos.
+
+**Variable**: `MERCADOPAGO_RUNTIME_ENVIRONMENT`
+
+Posibilidades de entrada:
+- `"local"`
+- `"server"`
+
+La autoprotección suele discernir los status entre estos dos parámetros sola, aunque siempre podrías interceder la bandera si el empaquetado final sufre problemas lógicos para entender en qué sub-etapa vive hoy el software.
+</ParamField>

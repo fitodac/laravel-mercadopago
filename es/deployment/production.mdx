@@ -1,0 +1,111 @@
+---
+title: Despliegue en Producción
+description: Desplegá Laravel MercadoPago a producción bajo las recomendaciones de alta disponibilidad y buenas prácticas.
+---
+
+Esta guía condensa la puesta en escena para subir el paquete de manera sólida a los servidores de producción; contemplando procesos como el caché, optimizaciones y consideraciones de los distintos entornos.
+
+## Pre-requisitos indispensables
+
+Previo al pase a producción, tu arquitectura requiere:
+
+- PHP `^8.2` y dependencias subyacentes sanas
+- Laravel `^12.0` operando íntegramente
+- Credenciales en modo Producción de Mercado Pago verdaderas y autorizadas. (Token, clave pública, clave del webhook)
+- HTTPS activo (Mercado Pago prohíbe las peticiones regulares para webhooks e inicialización sin conexiones de capa seguras tipo Let's Encrypt o SSL comercial)
+
+## Variables de Entorno y DotEnv
+
+<Steps>
+  <Step title="Configurando tu ambiente duro de producción">
+    Modificá el siguiente set de directrices en tu `.env` de servidor destino:
+
+    ```ini
+    APP_ENV=production
+    MERCADOPAGO_ACCESS_TOKEN=tu_access_token_real_generado_en_mp
+    MERCADOPAGO_PUBLIC_KEY=tu_public_key_real
+    MERCADOPAGO_WEBHOOK_SECRET=tu_secreto_para_firma_de_webhook
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    ```
+
+    <Warning>
+      Acordate bajo todo caso que este archivo NUNCA se debe acoplar o hacer push al control de códigos como Git.
+    </Warning>
+  </Step>
+
+  <Step title="Instalación de Dependencias">
+    Aprovecha y obligá al paquete a desechar variables de análisis o debugging con:
+
+    ```bash
+    composer install --no-dev --optimize-autoloader
+    ```
+  </Step>
+</Steps>
+
+## Clausura de Rutas "Demo"
+
+Existen seis (6) rutas catalogadas como de pre-producción/demo habilitadas que funcionan de manera fantástica al momento de desarrollo ya que facilitan simulaciones crudas. Sin embargo resultan invasivas bajo el entorno de explotación.
+
+El flag de tu `.env`: 
+`MERCADOPAGO_ENABLE_DEMO_ROUTES=false` imposibilitará sus usos de acá en adelante dando siempre a priori un código 404 mediante un Middleware incorporado.
+
+<Note>
+    Punto a tener presente: Esta regla excluye naturalmente a la ruta del `POST /api/mercadopago/webhooks`, la cual permanecerá activa y a la expectativa a toda hora.
+</Note>
+
+## Optimizaciones y Cachés de Framework
+
+Acostumbrá a Laravel a tomar ventajas del modo caching:
+
+<Steps>
+  <Step title="Limpiar remanentes de cachés locales en el servidor">
+    ```bash
+    php artisan config:clear
+    php artisan cache:clear
+    php artisan route:clear
+    ```
+  </Step>
+
+  <Step title="Compilar la ruta al máximo rendimiento">
+    ```bash
+    php artisan config:cache
+    php artisan route:cache
+    ```
+  </Step>
+
+  <Step title="Autoverificar y pingear las rutas seguras">
+    Larga una petición de tipo Test simulado contra tu IP para avalar este estado de producción:
+
+    ```bash
+    curl --request POST \
+      --url https://tu_url-en.com/api/mercadopago/webhooks \
+      --header 'Content-Type: application/json' \
+      --data '{"type":"payment","data":{"id":"123"}}'
+    ```
+
+    <Warning>
+      La respuesta debe fallar debido a un factor de `validated`: false. Es genial que lo haga, así es como detectamos que Mercado Pago es lo suficientemente estricto al solicitar firmas formadas de `x-signature` válidas desde afuera.
+    </Warning>
+
+  </Step>
+</Steps>
+
+## Troubleshooting Típico (En Entorno Producción)
+
+### Rutas a 404 Genéricos Globales
+
+Si observas un 404 sobre el Webhook intentá recargar tu cacheado. 
+```bash
+composer dump-autoload
+php artisan package:discover
+php artisan route:cache
+```
+
+## Próximos pasos recomendables
+
+<CardGroup cols={2}>
+  <Card title="Checklist de Seguridad Total" icon="shield" href="/es/deployment/security">
+    Profundizá aún más qué cosas se pueden mejorar.
+  </Card>
+</CardGroup>

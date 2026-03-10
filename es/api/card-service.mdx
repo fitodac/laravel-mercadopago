@@ -1,0 +1,87 @@
+---
+title: "CardService"
+description: "Pega plastilinas tokenizadas a tus Customer Service o las desenlaza."
+icon: "credit-card-front"
+---
+
+## Descripción de Responsabilidad
+
+El `CardService` es un obrero. No vive aislado. Su única función algorítmica es conectar los Tokens de Cartón con la Nube Gigante Inmutable de Clientes alojados previamente a nombre de un Merchant.
+
+<Note>
+  Las billeteras y medios de cobro requieren ser insertadas en un hueco "Customer", es imposible pedir agregar una tarjeta a un email crudo cualquiera en crudo.
+</Note>
+
+## Altas y Bajas (`create()` / `delete()`)
+
+### create()
+
+Doma y enlaza a MP la llave efímera temporal para inmortalizarla en la caja fuerte del Customer.
+
+```php
+public function create(string $customerId, array $payload): mixed
+```
+
+#### Variables Exigidas Fuerte
+
+<ParamField path="customerId" type="string" required>
+  El Alfanumérico esclavo de tu BD (mp_customer_id).
+</ParamField>
+
+<ParamField path="payload" type="array" required>
+  Un simple y burdo campo que aloje tu firma alocada y efímera desde JS.
+  <Expandable title="Estructura Minimalista (La magia viaja adentro)">
+    <ParamField path="token" type="string" required>
+      La String incomprensible producto del output de tu MercadoPago.js (`mp.createCardToken()`). MP abrirá esto internamente y se auto asignará los datos duros dentro de ella a tu CustomerID apuntado.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Info>
+  No puedes mandar un `number`, `cvv` al Backend y empaquetar un $payload. Es altamente penalizable, es hackeable y rompe las auditorías PCI en segundos. Envía el array token nada más.
+</Info>
+
+### Retornos Consolidados
+<ResponseField name="response" type="mixed">
+  Te devuelve una confirmación genérica en donde te avisa que captó la data.
+  <Expandable title="Metadatos expuestos amigables (El JSON retornado)">
+    <ResponseField name="id" type="string">
+      Identificador de Tarjeta dentro del Cajón Fuerte del id del Customer Master.
+    </ResponseField>
+    <ResponseField name="first_six_digits" type="string">
+      BIN Numérico para que sepas el banco o emisor y mostrarle dibujitos del Banco (450995).
+    </ResponseField>
+    <ResponseField name="last_four_digits" type="string">
+      Para que la rendereés al usuario (`visa finaliza en 3704`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Sintaxis Base
+
+<CodeGroup>
+```php Agregando múltiples medios
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+$admin = app(CardService::class);
+$clienteID = auth()->user()->mp_customer_id;
+
+$visa = $admin->create($clienteID, ['token' => $TokenJS_EnviadoVisAxios]);
+```
+</CodeGroup>
+
+### delete()
+
+Llama a una fulminación o desaprobación global para revocar transacciones a futuro contra ese plástico previamente acoplado.
+
+```php
+public function delete(string $customerId, string $cardId): mixed
+```
+
+#### Mecanismos Recomendados
+```php 
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+$bajaTarjeta = app(CardService::class);
+$bajaTarjeta->delete($usuario->mp_customer_id, $id_de_tarjeta_a_volar);
+```

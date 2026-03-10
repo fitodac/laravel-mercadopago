@@ -1,0 +1,127 @@
+---
+title: Buenas Prácticas de Seguridad
+description: Asegurá tu integración de Laravel MercadoPago con autenticación, HTTPS y gestión de credenciales
+---
+
+La seguridad es crítica cuando se manejan operaciones de pago. Esta guía cubre las prácticas de seguridad esenciales para el paquete Laravel MercadoPago.
+
+## Principios Básicos de Seguridad
+
+<Warning>
+  **Nunca commiteés credenciales a tu repositorio.** Toda la información sensible
+  debe almacenarse en variables de entorno o sistemas seguros de gestión de secretos.
+</Warning>
+
+El paquete requiere tres tipos de credenciales:
+
+1. **Access Token** (requerido) - Autentica las llamadas del SDK a Mercado Pago
+2. **Public Key** (opcional) - Usada para integraciones de checkout en el frontend
+3. **Webhook Secret** (recomendado) - Valida la autenticidad de la firma del webhook
+
+## Seguridad del Webhook
+
+La seguridad del webhook es crítica para prevenir notificaciones de pago fraudulentas.
+
+### Validación HMAC
+
+El paquete valida las firmas de los webhooks usando HMAC-SHA256 cuando se configura `MERCADOPAGO_WEBHOOK_SECRET`.
+
+<Steps>
+  <Step title="Configurá el secreto del webhook">
+    Definí tu secreto de webhook en el archivo `.env`:
+
+    ```ini
+    MERCADOPAGO_WEBHOOK_SECRET=tu_secreto_desde_el_dashboard_de_mercadopago
+    ```
+
+    Obtené este secreto de tu panel de Mercado Pago al configurar las notificaciones de webhook.
+  </Step>
+
+  <Step title="Manejá fallos de validación">
+    Cuando la validación HMAC de firma falla, el endpoint recibe y arroja un `401 Unauthorized`.
+
+    Monitoréalo de cerca dado que denota un potencial atacante que quiere vulnerar a la aplicación o un secreto anticuado:
+  </Step>
+</Steps>
+
+<Warning>
+  **Nunca deshabilites la validación de firmas de webhooks en producción.** Siempre
+  configurá `MERCADOPAGO_WEBHOOK_SECRET`.
+</Warning>
+
+### Lista Práctica de Webhook
+
+1. **Siempre validá firmas** - Configurá `MERCADOPAGO_WEBHOOK_SECRET` en producción.
+2. **Usá solo HTTPS** - Nunca expongas endpoints de webhook sobre HTTP crudo.
+3. **Confirmá la existencia** - Llama a MercadoPago para comparar si verdaderamente existe la Orden / Payment referido.
+4. **Idempotencia** - Las alertas de MP llegan de a decenas; sé resiliente a registros de pagos cruzados/duplicados.
+5. **Logs (Manejo de incidentes)** - Auditá validaciones corrompidas, ataques, o intentos fallidos.
+
+## Necesidad incondicional de HTTPS
+
+<Warning>
+  **HTTPS es obligatorio para entornos productivos.** Los Webhooks en el mundo moderno de Mercado Pago directamente no salen a flote mediante URLs estáticas estándar.
+</Warning>
+
+### Requerimientos de capa Web/TLS
+
+1. **Protección inherente de la comunicación entre APIs:** Se transfieren montos y clientes, debe ir cifrado.
+2. Certificado no-autotraspuesto ni caducado.
+
+En *Laravel*, si podés, redirigilo desde nivel superior mediante `AppServiceProvider`:
+
+```php
+public function boot(): void
+{
+    if ($this->app->environment('production')) {
+        \Illuminate\Support\Facades\URL::forceScheme('https');
+    }
+}
+```
+
+## Credenciales y Seguridad Dinámica
+
+Alojate las configuraciones sensibles adentro de tu ambiente:
+
+```ini
+# .env de Entorno local: TEST-123, de produccion: APP_USR
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-0941910...
+MERCADOPAGO_PUBLIC_KEY=APP_USR-...
+```
+
+### Rotación Segura de Claves (Rotation Policies) 
+
+Tras desvincular un servidor antiguo:
+- Modificá el webhook secret viejo del lado de MP 
+- Borralos del panel web / Reconfiguralos. 
+- Cambiá las credenciales `.env` y tirales su correspondiente `config:clear`, `config:cache`.
+
+## Restricciones sobre Rutas Demo
+
+Para mitigar riesgos mayores y asegurar que este ambiente de pre-pruebas integrado con endpoints demo ("Salud" u otros tipos de APIs genéricas generadoras) nunca operen comercialmente.
+
+Si tu Laravel asume un `local`, su Middleware les concederá acceso libre.
+
+Si dice estar en `production`, se autodestruyen tirando código `404 Not Found`. Acordate siempre de pasarlo mediante `.env` u `opts`.
+
+## Autenticación para los Endpoints (Controllers Customizados)
+
+Los endpoints expuestos propios atados a los "services" de este paquete no traen autorización o login prefijados: Si construyes, dale seguridad:
+
+```php
+Route::middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
+    Route::post('/pagos/abonar', [PagosController::class, 'store']);
+});
+```
+
+<Tip>
+ Asegurate también siempre de validar vía el `Request` (FormRequest/validate) los pagos propuestos de Frontend (`unit_price > 0.01` etc) previo al llamado.
+</Tip>
+
+## Siguientes Pasos de Despliegue
+
+<CardGroup cols={2}>
+  <Card title="Pase a Producción" icon="server" href="/es/deployment/production">
+    Pasos de caching final previos a la subida
+  </Card>
+</CardGroup>

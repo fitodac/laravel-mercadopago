@@ -1,0 +1,176 @@
+---
+title: Problemas Comunes
+description: Soluciones a los problemas frecuentemente encontrados al utilizar el paquete de Laravel MercadoPago
+---
+
+## Problemas de Configuración
+
+<Accordion title="Mercado Pago access token is not configured">
+  **Mensaje de error:**
+  ```
+  Mercado Pago access token is not configured.
+  ```
+
+**Causa:**
+El paquete no puede encontrar la variable de entorno `MERCADOPAGO_ACCESS_TOKEN`.
+
+**Solución:**
+
+1. Añadí el token de acceso a tu archivo `.env`:
+
+   ```ini
+   MERCADOPAGO_ACCESS_TOKEN=tu_access_token_aqui
+   ```
+
+2. Limpiá la caché de la configuración:
+
+   ```bash
+   php artisan config:clear
+   ```
+
+3. Verificá la salud de la configuración:
+   ```bash
+   curl http://localhost:8000/api/mercadopago/health
+   ```
+
+  <Warning>
+    Nunca subas el token de acceso a sistemas de control de versiones. Guardalo en el `.env` y asegurate que éste figure en el `.gitignore`.
+  </Warning>
+</Accordion>
+
+<Accordion title="El paquete está instalado pero no aparecen las rutas">
+  **Síntomas:**
+  - Ejecutar `php artisan route:list --name=mercadopago` no devuelve rutas.
+  - Peticiones a `/api/mercadopago/*` retornan error 404.
+
+**Solución:**
+
+1. Regenerá el autoloader y purgá paquetes:
+
+   ```bash
+   composer dump-autoload
+   php artisan package:discover
+   ```
+
+2. Limpiá la caché de las rutas:
+
+   ```bash
+   php artisan route:clear
+   ```
+
+3. Volvé a verificar el listado de rutas:
+   ```bash
+   php artisan route:list --name=mercadopago
+   ```
+</Accordion>
+
+## Problemas en las Rutas Demo
+
+<Accordion title="Error 404 estático en rutas de demo">
+  **Error:**
+  Rutas como `/api/mercadopago/health` o `/api/mercadopago/preferences` responden 404 incondicionalmente.
+
+**Causa:**
+Están protegidas por el Middleware `EnsureDemoRoutesEnabled`. Requieren de forma exigente que ambas condiciones se den:
+
+- `MERCADOPAGO_ENABLE_DEMO_ROUTES=true`
+- El entorno global en el framework sea **strictamente** `local` o `testing`.
+
+**Solución:**
+
+1. Revisá tu archivo `.env`:
+
+   ```ini
+   APP_ENV=local
+   MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+   ```
+
+2. Y actualizá todo el set de config del servidor en RAM:
+   ```bash
+   php artisan config:clear
+   ```
+</Accordion>
+
+<Accordion title="Las rutas sobreescriben a otra API anterior de mi sistema">
+  **Error:**
+  El paquete define prefijos por default con `api/mercadopago` e interfiere con lógica vieja.
+
+**Solución:**
+Personalizá ese prefijo re-definiéndolo desde tu archivo `.env`:
+
+```ini
+MERCADOPAGO_ROUTE_PREFIX=api/billetera/mercadopago
+```
+</Accordion>
+
+## Problemas de Webhooks
+
+<Accordion title="Webhook devuelve recurrentemente 401 Unauthorized">
+  **Mensaje de error:**
+  ```json
+  {
+    "ok": false,
+    "message": "Mercado Pago webhook signature is invalid."
+  }
+  ```
+
+**Causa:**
+La firma calculada no coincide o falta de datos.
+Sucederá cuando:
+- `MERCADOPAGO_WEBHOOK_SECRET` no sea exactamente igual a la dada en el dashboard
+- Faltan Headers obligatorios o viajan bajo reverse proxies maliciosos
+- El formato criptográfico vino corrupto
+
+**Mitigación inicial:**
+
+1. Comprobá los secretos contra el dashboard oficial integrador:
+   ```ini
+   MERCADOPAGO_WEBHOOK_SECRET=tu_secreto_webhook_aqui
+   ```
+2. Asegurate que MP esté derivando los encabezados `x-signature` (`ts` / `v1`) y el identificador general (`x-request-id`).
+</Accordion>
+
+<Accordion title="El Webhook de la app nunca recibe llamadas de MP">
+  **Problema:**
+  Mercado Pago indica éxito en la pantalla pero la llamada a los servidores del proyecto nunca impacta ni deja trazas en el log de Laravel.
+
+**Solución:**
+
+1. MP exige, por normativas de seguridad bancarias, que las URLs de retorno respondan activamente sobre **HTTPS**. Desistirá proactivamente sobre tramos inseguros http:80.
+2. Usá ngrok (o equivalentes) en local para exponer localhost bajo https:
+
+   ```bash
+   ngrok http 8000
+   ```
+3. Registrá la dirección final remota en el control de preferencias de URL de notificaciones (`notification_url`).
+</Accordion>
+
+## Errores Clásicos de SDK y APIs
+
+<Accordion title="Falta SDK principal de Mercado Pago">
+  **Mensaje:** `Mercado Pago PHP SDK is not installed.`
+
+**Solución:**
+
+1. Te ha saltado un paso de la instalación de composer de los sub-dependientes (SDK oficial base). Instalalo mediante:
+   ```bash
+   composer require mercadopago/dx-php:^3.8
+   ```
+</Accordion>
+
+<Accordion title="422 Unprocessable Entity - En Creaciones de Preferencias u otros">
+  **Causas clásicas:**
+  
+  1. Estructura armada mal validada contra el DTO requerido de mercado pago
+  2. Correos incorrectos
+  3. Precios unitarios o totales inconsistentes
+  
+  **Debugealo rápido activando un log antes de ejecutar**:
+  ```php
+  Log::info('Payload a mandar:', $payload);
+  ```
+</Accordion>
+
+## Más dudas
+
+Si tu escenario escapa a este glosario común de errores, podés buscar soporte o emitir cuestiones al mantenedor original y contribuyentes revisando el tablero de [Issues Oficiales de laravel-mercadopago en Github](https://github.com/fitodac/laravel-mercadopago/issues).

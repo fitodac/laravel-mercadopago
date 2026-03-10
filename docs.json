@@ -7,6 +7,7 @@
     "light": "#00B1EB",
     "dark": "#0082C3"
   },
+  "favicon": "/favicon.svg",
   "navbar": {
     "primary": {
       "type": "github",
@@ -19,85 +20,179 @@
     }
   },
   "navigation": {
-    "tabs": [
+    "languages": [
       {
-        "tab": "Documentation",
-        "groups": [
+        "language": "en",
+        "name": "English",
+        "tabs": [
           {
-            "group": "Get Started",
-            "pages": [
-              "introduction",
-              "installation",
-              "configuration"
+            "tab": "Documentation",
+            "groups": [
+              {
+                "group": "Get Started",
+                "pages": [
+                  "introduction",
+                  "installation",
+                  "configuration"
+                ]
+              },
+              {
+                "group": "Core Concepts",
+                "pages": [
+                  "concepts/architecture",
+                  "concepts/services",
+                  "concepts/credentials"
+                ]
+              },
+              {
+                "group": "Guides",
+                "pages": [
+                  "guides/quickstart",
+                  "guides/creating-preferences",
+                  "guides/processing-payments",
+                  "guides/handling-webhooks",
+                  "guides/managing-customers",
+                  "guides/refunds",
+                  "guides/testing"
+                ]
+              },
+              {
+                "group": "Deployment",
+                "pages": [
+                  "deployment/production",
+                  "deployment/security"
+                ]
+              },
+              {
+                "group": "Troubleshooting",
+                "pages": [
+                  "troubleshooting/common-issues",
+                  "troubleshooting/debugging"
+                ]
+              }
             ]
           },
           {
-            "group": "Core Concepts",
-            "pages": [
-              "concepts/architecture",
-              "concepts/services",
-              "concepts/credentials"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "guides/quickstart",
-              "guides/creating-preferences",
-              "guides/processing-payments",
-              "guides/handling-webhooks",
-              "guides/managing-customers",
-              "guides/refunds",
-              "guides/testing"
-            ]
-          },
-          {
-            "group": "Deployment",
-            "pages": [
-              "deployment/production",
-              "deployment/security"
-            ]
-          },
-          {
-            "group": "Troubleshooting",
-            "pages": [
-              "troubleshooting/common-issues",
-              "troubleshooting/debugging"
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Services",
+                "pages": [
+                  "api/preference-service",
+                  "api/payment-service",
+                  "api/customer-service",
+                  "api/card-service",
+                  "api/refund-service",
+                  "api/payment-method-service",
+                  "api/webhook-service",
+                  "api/test-user-service"
+                ]
+              },
+              {
+                "group": "Demo Endpoints",
+                "pages": [
+                  "api/endpoints/preferences",
+                  "api/endpoints/payments",
+                  "api/endpoints/customers",
+                  "api/endpoints/webhooks",
+                  "api/endpoints/payment-methods",
+                  "api/endpoints/test-users"
+                ]
+              },
+              {
+                "group": "Configuration",
+                "pages": [
+                  "api/configuration"
+                ]
+              }
             ]
           }
         ]
       },
       {
-        "tab": "API Reference",
-        "groups": [
+        "language": "es",
+        "name": "Español",
+        "tabs": [
           {
-            "group": "Services",
-            "pages": [
-              "api/preference-service",
-              "api/payment-service",
-              "api/customer-service",
-              "api/card-service",
-              "api/refund-service",
-              "api/payment-method-service",
-              "api/webhook-service",
-              "api/test-user-service"
+            "tab": "Documentación",
+            "groups": [
+              {
+                "group": "Comenzar",
+                "pages": [
+                  "es/introduction",
+                  "es/installation",
+                  "es/configuration"
+                ]
+              },
+              {
+                "group": "Conceptos Clave",
+                "pages": [
+                  "es/concepts/architecture",
+                  "es/concepts/services",
+                  "es/concepts/credentials"
+                ]
+              },
+              {
+                "group": "Guías",
+                "pages": [
+                  "es/guides/quickstart",
+                  "es/guides/creating-preferences",
+                  "es/guides/processing-payments",
+                  "es/guides/handling-webhooks",
+                  "es/guides/managing-customers",
+                  "es/guides/refunds",
+                  "es/guides/testing"
+                ]
+              },
+              {
+                "group": "Despliegue",
+                "pages": [
+                  "es/deployment/production",
+                  "es/deployment/security"
+                ]
+              },
+              {
+                "group": "Solución de problemas",
+                "pages": [
+                  "es/troubleshooting/common-issues",
+                  "es/troubleshooting/debugging"
+                ]
+              }
             ]
           },
           {
-            "group": "Demo Endpoints",
-            "pages": [
-              "api/endpoints/preferences",
-              "api/endpoints/payments",
-              "api/endpoints/customers",
-              "api/endpoints/webhooks",
-              "api/endpoints/payment-methods",
-              "api/endpoints/test-users"
-            ]
-          },
-          {
-            "group": "Configuration",
-            "pages": [
-              "api/configuration"
+            "tab": "Referencia API",
+            "groups": [
+              {
+                "group": "Servicios",
+                "pages": [
+                  "es/api/preference-service",
+                  "es/api/payment-service",
+                  "es/api/customer-service",
+                  "es/api/card-service",
+                  "es/api/refund-service",
+                  "es/api/payment-method-service",
+                  "es/api/webhook-service",
+                  "es/api/test-user-service"
+                ]
+              },
+              {
+                "group": "Endpoints Demo",
+                "pages": [
+                  "es/api/endpoints/preferences",
+                  "es/api/endpoints/payments",
+                  "es/api/endpoints/customers",
+                  "es/api/endpoints/webhooks",
+                  "es/api/endpoints/payment-methods",
+                  "es/api/endpoints/test-users"
+                ]
+              },
+              {
+                "group": "Configuración",
+                "pages": [
+                  "es/api/configuration"
+                ]
+              }
             ]
           }
         ]

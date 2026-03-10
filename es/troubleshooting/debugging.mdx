@@ -1,0 +1,91 @@
+---
+title: Debugging (Depuración)
+description: Técnicas y herramientas recomendadas para diagnosticar anomalías en tu instalación de Laravel MercadoPago
+---
+
+## Health Check Endpoint
+
+El paquete trae incrustado una ruta que diagnostica los parámetros operativos vitales internamente.
+
+<Note>
+  El test de Health (Salud mental del paquete) sólo existe mientras tus Rutas Demo se mantengan en pie, por ende se vuelve inaccesible desde Entornos de Producción.
+</Note>
+
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
+
+**Respuesta óptima alcanzada:**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "configured": true,
+    "has_public_key": true,
+    "has_webhook_secret": true,
+    "environment": "local"
+  },
+  "meta": []
+}
+```
+
+## Inspección de Rutas
+
+Verificá el comportamiento de Artisan para detectar colisiones en el montado automático.
+
+```bash
+php artisan route:list --name=mercadopago --columns=method,uri,name,middleware
+```
+
+Si tus rutas se encuentran listadas, la conexión núcleo a nivel Framework ha tomado control con éxito total. En el output debés constatar que aquellas que actúen con Middleware digan explícitamente `mercadopago.demo`.
+
+## Análisis y Manejo de Logs
+
+### Exponer información durante los Webhooks
+
+Para desmitificar qué trae el Webhook podés inyectar rápidamente interrupciones de debugeo que queden grabados el canal estándar general:
+
+```php
+Route::post('/custom-webhook', function (Request $request, WebhookService $service) {
+    Log::channel('daily')->info('Tramando Webhook Recibido', [
+        'cabeceras' => $request->headers->all(),
+        'cuerpo_json' => $request->all()
+    ]);
+
+    try {
+        $data = $service->handle($request);
+        Log::channel('daily')->info('Exito en procesamiento seguro: ', $data);
+        return $data;
+    } catch (\Exception $e) {
+        Log::channel('daily')->error('Ruptura de firmas', ['trazo' => $e->getTraceAsString()]);
+        throw $e;
+    }
+});
+```
+
+Luego bastará atar tu tail al archivo generado:
+```bash
+tail -f storage/logs/laravel-$(date +%Y-%m-%d).log
+```
+
+## Arquitectura de Errores a Controlar
+
+### 1. MercadoPagoConfigurationException
+Falla catastrófica por ausencia de configuración. Trae ramificaciones del estilo:
+- `missingAccessToken()`
+- `sdkNotInstalled()`
+
+Cierran devolviendo fatalmente en status 5xx.
+
+### 2. InvalidWebhookSignatureException
+Intentos de acceso forzados a webhooks de notificaciones sin el conocimiento previo de la llave privada HMAC configurada desde tu panel. Te advierte y desestima con un código `401 / Unauthorized`. Puede usarse si notas inundaciones desde IPs misteriosas que pretenden autoconfirmar facturaciones.
+
+## Depurando llamadas locales (Ngrok)
+
+Sigue siendo el método principal para conectar una App construida 100% en localhost y que no ve el exterior.
+
+1. Instalá y dispará: `ngrok http 8000`
+2. Copiá tu url remota asignada (`https://ab12sd.ngrok.app`)
+3. Pegá las notificaciones webhooks del dashboard Mercado Pago adjuntándoles tu prefijo (`/api/mercadopago/webhooks`).
+4. Entrá al portal inspector local `http://localhost:4040` y verificá a tiempo real sin logear cada campo que te envían en vivo.

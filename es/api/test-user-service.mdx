@@ -1,0 +1,78 @@
+---
+title: "TestUserService"
+description: "Servicio exclusivo para la fabricación en serie abstracta de cuentas virtuales probadoras para el entorno de Sandbox."
+icon: "vial"
+---
+
+## Resumen de utilidad
+
+Dado que la matriz de `Machine Learning` de Producción de Mercado Pago banea perfiles y plásticos de familiares tuyos si los usas para testear reiterativos flujos de compras que jamás terminan acreditandose de manera real; MP instauró de forma oficial la vía de creación de billeteras vacías descartables, y a eso es a lo que nos suscribimos con `TestUserService`.
+
+<Info>
+  Absolutamente todo lo que ataña crear billeteras falsas es inherentemente nulo en modo producción (Live) y jamás debes intentar acoplar este modelo de creación a tu software natural final real. Es una mecánica para uso personal para rellenar bases de datos temporales (Seeder/Factories Test Driven Development).
+</Info>
+
+## Creación Limpia
+
+```php
+public function create(array $payload): mixed
+```
+
+#### Parámetros Invocados
+
+<ParamField path="payload" type="array" required>
+  Dictamina de dónde es el ser humano virtual.
+  <Expandable title="País del Usuario Creado">
+    <ParamField path="site_id" type="string" required>
+      La nomenclatura clásica y rígida al unísono con tu panel de Admin: 
+      - `MLA` (Argentina), `MLB` (Brasil), `MLM` (México), `MLC` (Chile), `MCO` (Colombia).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### El Extramo Output Creado
+
+<ResponseField name="response" type="array">
+  MP dictará por vos sus credenciales forzadas y te las devolverá con la llave al paraíso test:
+  <Expandable title="Atributos Devueltos">
+    <ResponseField name="nickname" type="string">
+      Username burlesco y largo.
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      El correo con nomenclatura Test (El cual en un futuro deberás inyectar a tu `PreferenceService` al testear para que no salten fraudes).
+    </ResponseField>
+
+    <ResponseField name="password" type="string">
+      (Opcional visible) que te permite inclusive si estuvieses paranoico intentar loguearte gráficamente en mercado libre o mercado pago con ese usuario falso.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Implementación Ideal Sub-Sistema (Terminal)
+
+Ya proveemos de base nuestro propio `TestUserService` enraizado en la CLI tuya de desarrollador. No necesitás un controlador:
+
+```bash
+php artisan mp:create-test-user MLA
+```
+
+## Arquitectura Preveniente e Impedimentos de Producción
+Al momento de instanciar un Factory o querer armar un Test Local, evitá correr lógicas errónesas en live, aislalo:
+
+```php Controller de Mockups Admin Local Creado
+use Fitodac\LaravelMercadoPago\Services\TestUserService;
+
+public function fabricarBot(Request $request)
+{
+    if (app()->environment('production')) {
+        abort(403, 'Demencia total, ¿Qué estás haciendo?');
+    }
+
+    $botCompradorFalso = app(TestUserService::class)->create([
+        'site_id' => 'MLA',
+    ]);
+
+    return response()->json($botCompradorFalso);
+}
+```

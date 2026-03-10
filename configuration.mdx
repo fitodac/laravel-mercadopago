@@ -22,7 +22,9 @@ All configuration options can be set via environment variables in your `.env` fi
 <ParamField path="MERCADOPAGO_ACCESS_TOKEN" type="string" required>
   Your Mercado Pago access token. This is used by the SDK to authenticate API
   requests. **Where to find it**: Mercado Pago Dashboard → Your integrations →
-  Credentials ```ini .env
+  Credentials 
+  
+  ```ini .env
   MERCADOPAGO_ACCESS_TOKEN=APP_USR-1234567890123456-123456-abc123def456ghi789jkl012mno345-123456789
   ```
 </ParamField>
@@ -36,8 +38,11 @@ All configuration options can be set via environment variables in your `.env` fi
 
 <ParamField path="MERCADOPAGO_PUBLIC_KEY" type="string">
   Your Mercado Pago public key. Used for frontend integrations like card
-  tokenization. ```ini .env
-  MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890 ```
+  tokenization. 
+  
+  ```ini .env
+  MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890 
+  ```
 </ParamField>
 
 <ParamField path="MERCADOPAGO_WEBHOOK_SECRET" type="string">
@@ -110,9 +115,12 @@ config('mercadopago.enable_demo_routes')
     MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
     MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
     MERCADOPAGO_WEBHOOK_SECRET=test-webhook-secret
-    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago MERCADOPAGO_ENABLE_DEMO_ROUTES=true
-    ``` - Demo routes are accessible - Webhook validation is enabled - SDK uses
-    `local` runtime automatically
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    ```
+    - Demo routes are accessible
+    - Webhook validation is enabled
+    - SDK uses `local` runtime automatically
   </Tab>
 
   <Tab title="Production">
@@ -121,19 +129,24 @@ config('mercadopago.enable_demo_routes')
     MERCADOPAGO_PUBLIC_KEY=APP_USR-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
     MERCADOPAGO_WEBHOOK_SECRET=your-production-webhook-secret
     MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
-    MERCADOPAGO_ENABLE_DEMO_ROUTES=false ``` - Demo routes are disabled -
-    Webhook signature validation is required - SDK uses `server` runtime
-    automatically
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+    ```
+    - Demo routes are disabled
+    - Webhook signature validation is required
+    - SDK uses `server` runtime automatically
   </Tab>
 
   <Tab title="Testing">
     ```ini .env APP_ENV=testing
     MERCADOPAGO_ACCESS_TOKEN=TEST-1234567890123456-123456-abc123def456
     MERCADOPAGO_PUBLIC_KEY=TEST-a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890
-    MERCADOPAGO_WEBHOOK_SECRET= MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
-    MERCADOPAGO_ENABLE_DEMO_ROUTES=true ``` - Demo routes are accessible -
-    Webhook validation is optional (useful for testing) - SDK uses `local`
-    runtime automatically
+    MERCADOPAGO_WEBHOOK_SECRET=
+    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+    ```
+    - Demo routes are accessible
+    - Webhook validation is optional (useful for testing)
+    - SDK uses `local` runtime automatically
   </Tab>
 </Tabs>
 
@@ -216,14 +229,18 @@ After configuring the package, verify your setup using the health check endpoint
 
   <Step title="Configure webhook secret">
     Always set `MERCADOPAGO_WEBHOOK_SECRET` to validate incoming webhook
-    notifications. ```ini .env MERCADOPAGO_WEBHOOK_SECRET=your-production-secret
+    notifications.
+    ```ini .env 
+    MERCADOPAGO_WEBHOOK_SECRET=your-production-secret
     ```
   </Step>
 
   <Step title="Disable demo routes">
-    Explicitly disable demo routes in production: ```ini .env
-    MERCADOPAGO_ENABLE_DEMO_ROUTES=false ``` Even if left enabled, they won't
-    respond in production environments.
+    Explicitly disable demo routes in production:
+    ```ini .env
+    MERCADOPAGO_ENABLE_DEMO_ROUTES=false 
+    ``` 
+    Even if left enabled, they won't respond in production environments.
   </Step>
 
   <Step title="Use HTTPS">
@@ -232,8 +249,10 @@ After configuring the package, verify your setup using the health check endpoint
   </Step>
 
   <Step title="Cache configuration">
-    In production, cache your configuration for better performance: ```bash php
-    artisan config:cache ```
+    In production, cache your configuration for better performance: 
+    ```bash
+    php artisan config:cache 
+    ```
   </Step>
 </Steps>
 

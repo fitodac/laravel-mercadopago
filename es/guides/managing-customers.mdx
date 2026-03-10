@@ -1,0 +1,114 @@
+---
+title: "Gestión de Clientes y Fidelización"
+description: "Creá legajos de clientes vivos e ingresá y retenelos atados a tarjetas tokenizadas perennes."
+icon: "users"
+---
+
+El área de sub-servicio de "Customers" conforma la base matriz para las empresas de modelo SaaS o esquemas comerciales en donde deseamos guardar medios de pagos en la nube con altos esquemas PCI de retención para transaccionar suscripciones ocultas.
+
+## Razones para implementar "Customers"
+
+- **Autopistas "One Click Checkout"**: Jamás les requerirás volver a cargar todos los fastidiosos códigos de 16 números.
+- **Suscripciones Seguras**: Las tarjetas quedan listas bajo perfiles auditables mediante su correspondiente ID.
+
+<Note>
+  Laravel MercadoPago aboga por la seguridad informática total y cumple con normativas PCI. Nunca te devolvemos, y vos jamás deberías alojar/mirar/registrar o transferir por ningún motivo los números explícitos del plástico. Estos viajan mediante Tokens o `first_six` + `last_four`. Su persistencia es manejada aisladamente dentro del panel reservado de MercadoPago de tu base de administradores.
+</Note>
+
+## Altas y Creación
+
+<CodeGroup>
+```php Servicio Controlador
+<?php
+
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+public function crearClienteDurable(Request $request, CustomerService $service)
+{
+    $nuevoClienteRemoto = $service->create([
+        'email' => $request->usuario_nuevo_email,
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+    ]);
+
+    // Retornamos el flamante customer de MP en $nuevoClienteRemoto var.
+    return response()->json($nuevoClienteRemoto, 201);
+}
+```
+
+```bash Demo Manual
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/customers \
+  --header 'Content-Type: application/json' \
+  --data '{"email": "user@mi-server.com", "first_name": "Ana"}'
+```
+</CodeGroup>
+
+<Tip>
+  Si un `email` existe previamente adentro de la contabilidad de tu Token Público de Mercado Pago, la respuesta igual funciona pero retorna una actualización en memoria o simplemente te obsequia su correspondiente `Customer_id` que es el que nos incumbe en el sistema de facturación.
+</Tip>
+
+### Respuesta esperada tras creaciones y búsquedas de perfiles
+
+Dentro de `data` en el arbol final figura un array gigante:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "1234567-abc123def456",
+    "email": "customer@example.com",
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "cards": [],
+    "date_created": "2026-03-10T10:30:00.000-03:00",
+    "metadata": {...}
+  },
+  "meta": []
+}
+```
+
+Ese `"id": "1234567-abc123def456"` será crucial para nuestra tabla base de datos como columna esclava.
+
+## Gestionando Anexos (Tarjetas del Usuario)
+
+Con el `customer_id` amarrado ahora a la tabla de base de datos de de tu User Eloquent (`auth()->user()->mp_customer_id`), el usuario puede entrar a su panel frontend, tipearle al SDK Js los numeros en el Form y generar un Token Efímero de JS como aprendimos en procesamiento de pagos.
+
+Pero esta vez, en lugar de invocar `PaymentService`, invocamos a `CardService` (Servicio de Tarjetas de Perfiles):
+
+### Adición al portfolio
+
+```php
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+public function acoplarTarjeta(Request $request, CardService $card)
+{
+    // Rescatamos nuestro cliente.
+    $id = auth()->user()->mp_customer_id;
+
+    // Metemos el Token web
+    $nuevaMastercard = $card->create($id, ['token' => $request->hashToken_efimero]);
+
+    return response()->json($nuevaMastercard, 201);
+}
+```
+
+Esa tarjeta será perenne a menos que el usuario o desde Mercado Pago se exiga o aplique una desvinculación activa de su sistema de billetera virtual.
+
+### Cobros contra perfiles listos
+
+Cobraremos facturaciones repetitivas con nuestro `PaymentService`. No necesitamos armar tokens, pasaremos el `payer.id` (Customer id) y pasaremos el ID que nos retornó en la Adición al portfolio (Tarjetas id prefabricada) (`token`).
+
+```php
+$facturarMensualidad = $paymentService->create([
+    'transaction_amount' => 500.00,
+    'token' => '987_ID_CARD', 
+    'description' => 'Facturación recurrente mensual',
+    'installments' => 1,
+    'payment_method_id' => 'master',
+    'payer' => [
+        'id' => auth()->user()->mp_customer_id, 
+        'email' => auth()->user()->email,
+    ],
+]);
+```

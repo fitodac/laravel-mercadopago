@@ -1,0 +1,126 @@
+---
+title: "Preferences API"
+description: "Ruta de fabricación enlatada destinada a armar Checkout Pros a toda la velocidad posible."
+icon: "receipt"
+---
+
+## Resumen Orgánico
+
+La Ruta de Preferencias consolida la orquestación y ensamble de una lista de artículos pre-seleccionados de un ecommerce, los decora con reglas condicionales y les aplica caducidad a su oferta, emitiendo como recompensa un Link al entorno inmersivo de Mercado Pago de transacciones con pantalla completa.
+
+<Warning>
+  Desactivado incondicionalmente al setear Modo Producción. Funciona sólo como atajo velóz para Frontend Developers en ambientes cerrados al emular llamadas de red locales.
+</Warning>
+
+## Emitiendo un Ticket de Preferencia
+
+Ingresa el cúmulo de bienes a abonar, devuelve la orden ensamblada para ser navegada.
+
+### Endpoint
+
+```
+POST /api/mercadopago/preferences
+```
+
+### Cabeceras Variables
+
+<ParamField path="items" type="array" required>
+  Mazo de articulos adquiribles (Obligatorio > 0 iteraciones).
+  <Expandable title="Articulado Obligatorio">
+    <ParamField path="items.*.title" type="string" required>
+      Nombre mercantil.
+    </ParamField>
+
+    <ParamField path="items.*.quantity" type="integer" required>
+      Sumatoria de pedidos del mismo tipo (> 0).
+    </ParamField>
+
+    <ParamField path="items.*.unit_price" type="numeric" required>
+      Valor estipulado (Suma positiva real > 0.00).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="payer" type="object">
+  Datos de quién sufraga los costos
+  <Expandable title="Estructura del Gastador">
+    <ParamField path="payer.email" type="string">
+      Correo electrónico oficial vinculado a sus compras pasadas.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="back_urls" type="object">
+  El tridente de navegación a inyectarle a Mercado Pago para volver luego del Checkout.
+  <Expandable title="Las Tres Salidas (URLs)">
+    <ParamField path="back_urls.success" type="string">
+      Triunfaste, cobro cerrado.
+    </ParamField>
+
+    <ParamField path="back_urls.pending" type="string">
+      Elegiste RapiPago o Redes Paralelas Offlines y ahora debes ir al supermercado a gastar billetes del mundo físico para liberar el pedido o decidiste girar y falta que un humano lo apruebe.
+    </ParamField>
+
+    <ParamField path="back_urls.failure" type="string">
+      Huiste de la pantalla de Checkout por hastío o no tenías dinero en los plásticos habilitados e informaron de "Saldo Insuficiente".
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="notification_url" type="string">
+  La baliza remota tuya a la cual enviarán POSTs con updates a ciegas detrás de bambalinas.
+</ParamField>
+
+<ParamField path="external_reference" type="string">
+  Atributo vital para poder linkear tu Modelo Orden de Laravel, y la Factura Interna que acaba de expedir MP.
+</ParamField>
+
+<ParamField path="expires" type="boolean">
+  Conjuración activa para habilitar caducidad en el cobro y no permitirle guardar links.
+</ParamField>
+
+<ParamField path="expiration_date_to" type="date">
+  La hora cero en ISO (Muerte de vigencia de la preferencia abonable).
+</ParamField>
+
+### Objeto de Retorno
+
+Obtendrás de la propia garganta de MP el mapa final.
+
+<ResponseField name="data" type="object">
+  El calco de todo lo inyectado arriba.
+  <Expandable title="Metadatos más jugosos y exclusivos">
+    <ResponseField name="id" type="string">
+      Sello incodificable de identificación principal de esta orden nacida.
+    </ResponseField>
+
+    <ResponseField name="init_point" type="string">
+      El URL hiper-largo y complicado apuntando a MP oficial produccion donde debés redirigir mágicamente al Comprador en JavaScript o PHP desde el servidor para que ponga las tarjetas con encriptación visual verde y pague.
+    </ResponseField>
+
+    <ResponseField name="sandbox_init_point" type="string">
+      URL emulada, es decir que acepta test-users de compradores de mentira para no impactar las métricas live y es completamente inocuo.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Lanzador tipo cURL (Linux/Mac)
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/preferences \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "items": [
+      {
+        "title": "Producto demo",
+        "quantity": 1,
+        "unit_price": 100.5
+      }
+    ]
+  }'
+```
+
+## Guía sobre Responsabilidad Arquitectónica
+
+Tal como el resto del framework y rutas prearmadas de Test de esta suite, por más de que cuentes con el confort de tener la ruta activa, nunca debés depender de su lógica cruda para armar tus integraciones públicas serias. Instanciá `PreferenceService` y armate un Factory real controlado mediante `$request->validate()` crudo para que tus sistemas comerciales resulten blindados a las inclemencias del Frontend.

@@ -1,0 +1,127 @@
+---
+title: "Manejo de Webhooks"
+description: "Recibí, desencriptá y validá de forma infranqueable las notificaciones de Mercado Pago."
+icon: "webhook"
+---
+
+Los webhooks son el pan de cada día en métodos asíncronos. Resultan ser notificaciones POST ininteligibles a simple vista enviadas de servidor a servidor (Server-to-Server).
+
+## Por qué importan tanto
+
+<Warning>
+  Construir un pago donde habilites los servicios a los usuarios basándote simplemente en que visitó tu URL exitosa de retorno es abyectamente desaconsejable, propenso a inyecciones en el frontend (client-side) y caótico. Solamente debés confiar cuando recibes el Status consolidado desde el Webhook de tu Backend cerrado.
+</Warning>
+
+A diferencia del Frontend, los webhooks:
+- No tienen forma de ser interferidos ni manipulados por el cliente.
+- Procesan pagos extra-limpios como depósitos inter-bancarios que tardaron un día en acreditarse.
+- Reaccionan a eventos póstumos, tales como contra-cargos y devoluciones solicitadas.
+
+## Configuración y Reglas Nativas
+
+### El punto del paquete (Endpoint)
+
+El paquete provee, a prueba de balas, la locación activa para recibir alertas por defecto:
+
+```text
+POST /api/mercadopago/webhooks
+```
+
+Este enrutamiento **nace y muere con la aplicación** permanentemente abierto en tu Laravel, e ignora cualquier regla de `MERCADOPAGO_ENABLE_DEMO_ROUTES` (dado que los envíos desde Producción lo ameritan constante).
+
+### Configurando el Hash Secreto HMAC
+
+```ini
+MERCADOPAGO_WEBHOOK_SECRET=tu_secreto_proveido_por_el_panel_de_mercadopago
+```
+
+El Secret permite una operación matemática en la cual:
+1. Vos conocés la clave y la máquina de MP también.
+2. Te llega un `x-signature` cabecera.
+3. Se firma localmente mediante el `WebhookService` comparando la cadena exacta.
+
+Si la validación resulta exitosa, tu hook se marca como `validated => true`. Es imposible burlar una encriptación HMAC de este calibre. 
+
+## Estructura normal del envío (Payload)
+
+```json
+{
+  "type": "payment",
+  "data": {
+    "id": "123456789"
+  }
+}
+```
+
+### Tópicos manejables
+
+| Tipo (Topic)     | Representación |
+| ---------------- | ---------------------- |
+| `payment`        | Cobros directos, o vía preferencias |
+| `merchant_order` | Cambios en un intento de orden global   |
+| `subscription`   | Disparos regulares para Pre-Aprobaciones de Debito     |
+| `invoice`        | Avisos de emisión de cobro recurrente          |
+
+## Procesando los Webhooks (Implementaciones Propias)
+
+El motor principal (`WebhookService`) siempre devolverá esta sana respuesta tras auditar a la notificación:
+
+```php
+[
+    'acknowledged' => true,
+    'validated' => true,
+    'topic' => 'payment',
+    'resource' => '123456789',  // ID de BD en Mercado Pago para tu order o payment
+    'payload' => [...],
+]
+```
+
+<Warning>
+  El Webhook avisa que HUBO un cambio. **NO** dice la naturaleza integral de él. Puede que avise "Se anuló o rechazó" tu payment ID: 12345. Tu deber es invocar un GET mediante el paquete al $resource que te indican para obtener su estado actual.
+</Warning>
+
+### Opción A (Job Queues - Recomendada)
+
+Respondé siempre en < 3 a 5 segundos con 200/201 al servidor y dejale los escrutineos a las Colas de Tareas de Laravel:
+
+```php
+use App\Jobs\ProcesoGlobalPagosWebhook;
+
+public function __invoke(Request $request, WebhookService $service): JsonResponse {
+    $result = $service->handle($request);
+
+    if (!$result['validated']) {
+        return response()->json(['error' => 'No Autorizado, Firma HMAC Apócrifa.'], 401);
+    }
+
+    ProcesoGlobalPagosWebhook::dispatch($result['topic'], $result['resource'])->onQueue('webhooks');
+
+    return response()->json(['ok' => true]);
+}
+```
+
+### Opción B (Procesado Inline - No escalable a alto rps)
+
+```php
+public function __invoke(Request $request, WebhookService $webService, PaymentService $mp) {
+    $alerta = $webService->handle($request);
+
+    if ($alerta['topic'] === 'payment') {
+        // Obtenemos los pormenores REALES a la DB de Mercado Pago
+        $factura = $mp->get($alerta['resource']);
+
+        if($factura->status === "approved") {
+           Pedido::where('identificador_externo', $factura->external_reference)
+                ->update(['pagado' => true]);     
+        }
+    }
+
+    return response()->json(['ok' => true]);
+}
+```
+
+### Checklist antes de ir a Producción Final
+- ✅ Tu URL de Webhooks se sirve obligatoriamente mediante capa SSL Let's Encrypt (HTTPS).
+- ✅ Activaste HMAC e incrustaste la variable Secreta.
+- ✅ Manejás correctamente redundancia por si mandan la petición más de una vez consecutiva en el mismo segundo o hora. (Logré mitigarlo mediante locks de exclusión de redis o unique guards en DB.)
+- ✅ Siempre le devuelves a MercadoPago un `return response()->json([], 200)` para que no reintente contactarte o apague intermitentemente tu endpoint.

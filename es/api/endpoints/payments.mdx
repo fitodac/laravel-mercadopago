@@ -1,0 +1,127 @@
+---
+title: "Payments API"
+description: "Ruta de inyección para facturar tarjetas enviadas desde el Frontend o emitir reintegros."
+icon: "credit-card"
+---
+
+## Resumen
+
+La API general de `Payments` aloja aquellas rutas destinadas a crear débitos directos sin pantallas intermedias usando plásticos o redes encriptadas, a recuperarlos, o bien a devolver su dinero en caso de disconformidad del comprador.
+
+<Warning>
+  Como norma inquebrantable de Seguridad, todas las URL listadas en este archivo nacen "Inertes" o dan Error 404 en el momento en que Laravel corra bajo modo Producción. 
+  Solo resucitan si configurás expresamente `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` y tu base corre en `APP_ENV=local|testing`.
+</Warning>
+
+## Cargar un Pago (`POST`)
+
+Dispara un débito instantáneo a una tarjeta tokenizada proveniente de SDK MercadoPago.js
+
+### Endpoint
+
+```
+POST /api/mercadopago/payments
+```
+
+### Cabezas del Request y Parámetros Obligatorios
+
+<ParamField path="transaction_amount" type="numeric" required>
+  Monto de quita. Mínimo tolerado: 0.01
+</ParamField>
+
+<ParamField path="token" type="string" required>
+  Hash representativo del cartón encriptado por MP.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Motivo del cargo bancario.
+</ParamField>
+
+<ParamField path="installments" type="integer" required>
+  Cuotas y sus intereses adjudicados. Mínimas: 1
+</ParamField>
+
+<ParamField path="payment_method_id" type="string" required>
+  Bandera del emisor. (Ej: "visa", "master", "cabal").
+</ParamField>
+
+<ParamField path="payer" type="object" required>
+  Fiscalía de quién emite el pago
+  <Expandable title="Propiedades">
+    <ParamField path="payer.email" type="string" required>
+      Dirección de correo de validación a Mercado Libre cruzada.
+    </ParamField>
+
+    <ParamField path="payer.identification" type="object">
+      Documentación (DNI).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="external_reference" type="string">
+  El SKU o referencial atado a tu propia DB de Pedidos.
+</ParamField>
+
+### Objeto Resultante desde la API
+
+<ResponseField name="data" type="object">
+  El estado real del débito efectuado o denegado.
+  <Expandable title="Data vital del dictamen">
+    <ResponseField name="id" type="integer">
+      Folio de transacción gigantesco del ticket.
+    </ResponseField>
+
+    <ResponseField name="status" type="string">
+      Veredicto final: `approved` (Te entró plata), `pending`, `rejected` (Denegado).
+    </ResponseField>
+
+    <ResponseField name="status_detail" type="string">
+      En caso de rechazo, informa si fue por Límite de Tarjeta, Robo, o mal tipado del CVV.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Retiro Espontáneo de Fondos (Reintegro Total / Fraccionado)
+
+Revertir operaciones exitosas aprobadas.
+
+### Endpoint
+
+```
+POST /api/mercadopago/payments/{paymentId}/refunds
+```
+
+### Ruteos Patrón
+
+<ParamField path="paymentId" type="string" required>
+  El identificador largo original del cobro que ahora quieres deshacer.
+</ParamField>
+
+### Parámetro Opcional (Vacío es Totalidad)
+
+<ParamField path="amount" type="numeric">
+  Monto a devolver. Mínimo 0.01.
+  <Note>Si envías el Payload completamente vacío (`{}`) asume que debe devolver la totalidad del pago por vos de forma automática.</Note>
+</ParamField>
+
+### Carga Vía cURL - Exigiendo Devolución Total de Dinero
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/payments/12345/refunds \
+  --header 'Content-Type: application/json' \
+  --data '{}'
+```
+
+### Carga Vía cURL - Exigiendo devolver $50.00 del pedido reteniendo el resto porque un producto faltaba en stock nada mas
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/payments/12345/refunds \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "amount": 50
+  }'
+```

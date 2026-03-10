@@ -1,0 +1,87 @@
+---
+title: "WebhookService"
+description: "Ingesta, digestión y validación criptográfica militar de las notificaciones POST entrantes."
+icon: "webhook"
+---
+
+## La Arquitectura General
+
+El `WebhookService` funciona como un Patovica o Guardia Pretoriano a la puerta secreta de tu aplicación. Recibe los POST, escudriña su procedencia mediante auditorías de firmas HMAC y las digiere en diccionarios amigables.
+
+## El Motor Único (`handle()`)
+
+```php
+public function handle(Request $request): array
+```
+
+#### Alimentación
+
+<ParamField path="request" type="Illuminate\Http\Request" required>
+  Delega la Request original y desnuda entrante completa inyectada por Laravel.
+</ParamField>
+
+#### El Diccionario Saliente Aprobado (Response)
+
+<ResponseField name="response" type="array">
+  Te devuelve lo siguiente ya lavado:
+  <Expandable title="Retornos extraídos y pulidos">
+    <ResponseField name="validated" type="boolean">
+      Indicará `true` si empató a la perfección usando el Secreto provisto y `false` en caso en que se te halla olvidado estipular un Secreto en tu `.env`.
+    </ResponseField>
+
+    <ResponseField name="topic" type="string">
+      Estandarización del evento (`payment`, `merchant_order`, `subscription`).
+    </ResponseField>
+
+    <ResponseField name="resource" type="string">
+      La estampita (ID) que te proveen para que vayas y busqués vos mismo los pormenores verdaderos contra con GET.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Protegidos Anti-Ataques
+
+Si el motor nota intromisiones extrañas, directamente hará volar la capa del request por los aires:
+
+<ResponseField name="InvalidWebhookSignatureException" type="exception">
+  Saltará irremediablemente abortándolo todo (No tendrás que lidiar siquiera con armar un condicional para atajar un `false` en validated): 
+  - La petición carece de Cabeceras (`headers`) fidedignas con la encriptación.
+  - La suma del HMAC-SHA256 con tu Password da un dictamen incompatible acusando de apócrifa o modificada en tránsito (Man-in-the-middle).
+</ResponseField>
+
+#### Código Maestro a Nivel Producción
+
+```php Controlador Destino del Ruteo
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use Fitodac\LaravelMercadoPago\Exceptions\InvalidWebhookSignatureException;
+
+final class GatewayMercadoPago
+{
+    public function __invoke(Request $req, WebhookService $gate): JsonResponse 
+    {
+        try {
+            $dataAuditada = $gate->handle($req);
+
+            // Rebotamos limpiamente a Despachantes Paralelos (Job Queues)
+            match ($dataAuditada['topic']) {
+                'payment' => ProcesoPagosEntrantes::dispatch($dataAuditada['resource']),
+                'merchant_order' => ProcesoModificacionesGlobles::dispatch($dataAuditada['resource']),
+                default => \Log::info('Vigente pero de tópico ignorado para el sistema.', $dataAuditada),
+            };
+
+            return response()->json(['status' => 'despachado a colas de ramificacion'], 201);
+
+        } catch (InvalidWebhookSignatureException $e) {
+            \Log::alert('HACKER/INTENTO INVALIDO REPELIDO: ', [$req->ip()]);
+            return response()->json(['error' => 'Váyase.'], 401);
+        }
+    }
+}
+```
+
+## Entendiendo el Motor de Firmado HMAC-SHA256
+
+El motor nativo interior funciona mediante:
+1. Rastreados de Headers `ts` y `v1` (Timestamp e Invocación Hash).
+2. Se fabrica en tiempo real un manifiesto compuesto sumando todo crudo.
+3. Se firma localmente mediante el `MERCADOPAGO_WEBHOOK_SECRET` tu hash y se lo hace colacionar codo a codo en memoria contra el inyectado.

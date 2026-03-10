@@ -1,0 +1,150 @@
+---
+title: Introducción
+description: Laravel MercadoPago es un paquete reutilizable para integrar Mercado Pago en proyectos Laravel 12 con servicios desacoplados y endpoints de API JSON.
+---
+
+## Qué es este paquete
+
+Laravel MercadoPago simplifica la integración con los servicios de pago de Mercado Pago en aplicaciones Laravel. Construido con prácticas modernas de PHP y la arquitectura del contenedor de servicios de Laravel, provee una interfaz limpia y testeable al SDK de Mercado Pago.
+
+## Qué resuelve
+
+El paquete se encarga de la complejidad de la integración:
+
+- **Gestión de credenciales** — Resuelve credenciales desde configuración y variables de entorno automáticamente
+- **Configuración del SDK** — Configura el SDK de Mercado Pago con access tokens y ajustes del entorno de ejecución
+- **Capa de servicios** — Provee servicios inyectables para todas las operaciones principales de Mercado Pago
+- **Seguridad en webhooks** — Registra un endpoint de webhook con validación de firma HMAC cuando se configura un secreto
+- **Soporte para desarrollo** — Expone rutas demo para pruebas locales
+
+<Note>
+  El paquete se enfoca en encapsular la comunicación con el SDK de Mercado Pago
+  y exponer una base de API reutilizable. **No** incluye migraciones,
+  vistas Blade, componentes frontend, persistencia de pagos ni colas preconfiguradas.
+</Note>
+
+## Funcionalidades principales
+
+### Cobertura completa de servicios
+
+El paquete incluye servicios dedicados para todas las operaciones principales de Mercado Pago:
+
+- **PreferenceService** — Creá y gestioná preferencias de pago para Checkout Pro
+- **PaymentService** — Procesá y consultá pagos
+- **RefundService** — Manejá reembolsos totales y parciales
+- **CustomerService** — Gestioná registros de clientes
+- **CardService** — Almacená y gestioná tarjetas de clientes
+- **PaymentMethodService** — Consultá los medios de pago disponibles
+- **TestUserService** — Generá usuarios de prueba para entornos de QA
+- **WebhookService** — Recibí y validá notificaciones de Mercado Pago
+
+### Auto-discovery incluido
+
+El paquete aprovecha la función de auto-discovery de Laravel, registrando automáticamente:
+
+```php
+Fitodac\LaravelMercadoPago\LaravelMercadoPagoServiceProvider::class
+```
+
+No necesitás registrar el proveedor manualmente en `config/app.php`.
+
+### Configuración de rutas flexible
+
+- **Siempre activa**: Endpoint de webhook en producción en `/api/mercadopago/webhooks`
+- **Rutas demo**: Endpoints de desarrollo y testing (habilitados solo en entornos `local` y `testing`)
+- **Prefijo personalizable**: Configurá el prefijo de rutas con variables de entorno
+
+### Seguridad de base
+
+- Validación de firma HMAC para autenticidad del webhook
+- Resolución de credenciales basada en el entorno
+- Protección de rutas demo (deshabilitadas en producción)
+- Entornos de ejecución configurables
+
+## Requisitos
+
+<Steps>
+  <Step title="PHP 8.2 o superior">
+    El paquete requiere PHP `^8.2` con declaraciones de tipos estrictos.
+  </Step>
+
+  <Step title="Laravel 12">
+    Compatible con los componentes del framework Laravel 12:
+    - `illuminate/contracts ^12.0`
+    - `illuminate/http ^12.0`
+    - `illuminate/routing ^12.0`
+    - `illuminate/support ^12.0`
+  </Step>
+
+  <Step title="SDK de Mercado Pago">
+    Incluye el SDK oficial de Mercado Pago para PHP `mercadopago/dx-php ^3.8`
+  </Step>
+</Steps>
+
+## Qué NO incluye
+
+Para mantener el foco y la flexibilidad, este paquete excluye intencionalmente:
+
+- **Migraciones de base de datos** — La lógica de persistencia de pagos pertenece a tu aplicación
+- **Vistas Blade** — La integración frontend es específica de cada proyecto
+- **Componentes UI** — Los widgets de JavaScript y formularios de checkout se implementan por separado
+- **Colas de jobs** — La configuración de colas depende de tu arquitectura
+- **Lógica de negocio** — Autenticación, autorización y reglas de dominio quedan en tu app
+
+<Warning>
+  Las rutas demo son herramientas de apoyo, no una capa de negocio completa. Para
+  uso en producción, inyectá los servicios en tus propios controladores con la
+  autenticación y autorización adecuada.
+</Warning>
+
+## Filosofía de arquitectura
+
+Laravel MercadoPago sigue una **arquitectura orientada a servicios**:
+
+1. **Los servicios encapsulan las llamadas al SDK** — Cada servicio envuelve funcionalidad específica de la API de Mercado Pago
+2. **Listo para inyección de dependencias** — Todos los servicios se registran como singletons en el contenedor
+3. **Independiente del controlador** — Usá los servicios en controladores, actions, jobs o commands
+4. **Testeable** — Los servicios se pueden mockear y probar de manera independiente
+
+### Patrón de implementación recomendado
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Http\Request;
+
+class CheckoutController
+{
+    public function __construct(
+        private PreferenceService $preferenceService
+    ) {}
+
+    public function createPreference(Request $request)
+    {
+        $validated = $request->validate([
+            'items'             => 'required|array',
+            'items.*.title'     => 'required|string',
+            'items.*.quantity'  => 'required|integer|min:1',
+            'items.*.unit_price'=> 'required|numeric|min:0',
+        ]);
+
+        $preference = $this->preferenceService->create($validated);
+
+        return response()->json([
+            'id'         => $preference['id'],
+            'init_point' => $preference['init_point'],
+        ]);
+    }
+}
+```
+
+## Próximos pasos
+
+<CardGroup cols={2}>
+  <Card title="Instalación" icon="download" href="/es/installation">
+    Instalá el paquete via Composer y configurá el auto-discovery
+  </Card>
+
+  <Card title="Configuración" icon="gear" href="/es/configuration">
+    Configurá variables de entorno y publicá los archivos de configuración
+  </Card>
+</CardGroup>

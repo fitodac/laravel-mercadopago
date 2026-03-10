@@ -1,0 +1,106 @@
+---
+title: "Test Users API"
+description: "Punto de Inyección Falso y Exclusivo Inercial para Cuentas Compradores y Vendedores Apócrifas."
+icon: "vial"
+---
+
+## Resumen
+
+La Ruta de "Test Users" te ahorra la necesidad de ejecutar Comandos de Terminal y clona un Usuario para las pruebas integrales inyectando data directa consumible tipo JSON.
+
+<Warning>
+  Esta URL morirá automáticamente de tu Laravel (Error 404 Route NotFound) en el instante que subas tu servidor a Producción a protegerte.
+</Warning>
+
+## Emitiendo Alta Comercial (`POST`)
+
+Fabricará correos alocados con perfiles funcionales.
+
+### Endpoint
+
+```
+POST /api/mercadopago/test-users
+```
+
+### Cabezas del Request y Requisitos
+
+<ParamField path="site_id" type="string" required>
+  Dictamina la moneda que gastará en falsos para que corras los algoritmos de suma de tu empresa validándola: 
+  - `MLA` - Argentina
+  - `MLB` - Brazil
+  - `MLC` - Chile
+  - `MLM` - Mexico
+</ParamField>
+
+<ParamField path="description" type="string">
+  Una simple anotación de base de datos extrañarte menos cuando veas un millón de bots tu Dashboard (Ej: "Bot de QA para Fallas de Tarjetas").
+</ParamField>
+
+### JSON Respuesta
+
+<ResponseField name="data" type="object">
+  El ticket y su llave dorada de acceso
+  <Expandable title="Propiedades Invertidas">
+    <ResponseField name="id" type="integer">
+      Folio real del tipo MP.
+    </ResponseField>
+
+    <ResponseField name="nickname" type="string">
+      Apodo random con letras e identificadores ilegibles (Falsedad intencionada de ML).
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      Dirección generada a mano virtual por el host `(test_user_xxxxxxxxxx@testuser.com)`. Cópialo con cariño, lo necesitarás para pegar el test en los pagos.
+    </ResponseField>
+
+    <ResponseField name="password" type="string">
+      Te la proveen por si insólitamente necesitás iniciar sesión en la web frontal blanca de MP con el bot falso (Usualmente qatestxxxx).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Obteniendo al Bot Pruebas (Terminal)
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/test-users \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "site_id": "MLA",
+    "description": "Usuario Falso Comprador Carga Pesada"
+  }'
+```
+
+```json Output
+{
+  "ok": true,
+  "data": {
+    "id": 123456789,
+    "nickname": "TESTUSER123456",
+    "password": "qatest123",
+    "site_status": "active",
+    "site_id": "MLA",
+    "email": "test_user_123456@testuser.com"
+  },
+  "meta": []
+}
+```
+
+## Próximos pasos una vez fabricado el Bot
+
+Acabas de trazar tu propia IA o Script que fabricó al Bot que simulará ser el Comprador de tu Remera o Producto.
+
+1. Ahora que tienes el Correo (`test_user_123456@testuser.com`), usás tu software local y ejecutás transacciones usandolo en el bloque de Payload de `payer.email` = tu correo bot.
+2. Mercado Pago reconocerá instantáneamente que tu vendedor y tu SDK están interactuando financieramente con un actor virtual, con lo cuál derivará y desactivará las protecciones anti-fraude, permitiéndote que envíes tarjetas de "Falso-Fallido" (`cc_rejected_insufficient_amount`) para asegurarte que tu UI renderice el alerta roja correspondiente en pantalla de rechazo sin tener que arruinar tu billetera real en el intento.
+
+## Cartones pre-armados Ficticios de Prueba
+
+<Note>
+  Estos cartones (Plásticos falsos numéricos) son de uso internacional de la Sandbox. Simulan estados para disparar alertas adrede sin gastar plata. 
+</Note>
+
+| Entidad Virtual | N° Master Cartón | CVC | Venc | Acción Disparada (Falsa)
+| ------------ | ------------------- | ---- | ------ | -------|
+| Compra Exitosa (Mastercard) | `5031` `7557` `3453` `0604` | 123  | 11/25  | `approved` |
+| Billetera Vacía / Saldo Insuficiente (Rebotado) | `5031` `4332` `1540` `6351` | 123 | 11/25 | `cc_rejected_insufficient_amount` |
+| Bloqueada por Prev. Fraude IP (Rebotado)| `5031` `4336` `9399` `1761`| 123| 11/25 | `cc_rejected_high_risk`|
