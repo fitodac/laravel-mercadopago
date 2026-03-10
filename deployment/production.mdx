@@ -1,20 +1,27 @@
 ---
-title: "Production Deployment"
-description: "Deploy Laravel MercadoPago to production with recommended configuration and best practices"
+title: Production Deployment
+description: Deploy Laravel MercadoPago to production with recommended configuration and best practices
 ---
+
+This guide covers deploying the Laravel MercadoPago package to production servers, including configuration, caching, and environment-specific settings.
 
 ## Prerequisites
 
+Before deploying to production, ensure you have:
+
 - PHP `^8.2` installed on your production server
 - Laravel `^12.0` configured and working
-- Valid MercadoPago production credentials
+- Valid MercadoPago production credentials (access token, public key, webhook secret)
 - HTTPS enabled on your domain
+- Composer available for dependency installation
 
 ## Environment Variables
 
 <Steps>
   <Step title="Configure production environment">
-    ```bash .env
+    Set the following environment variables in your production `.env` file:
+
+    ```ini
     APP_ENV=production
     MERCADOPAGO_ACCESS_TOKEN=your_production_access_token
     MERCADOPAGO_PUBLIC_KEY=your_production_public_key
@@ -22,21 +29,77 @@ description: "Deploy Laravel MercadoPago to production with recommended configur
     MERCADOPAGO_ENABLE_DEMO_ROUTES=false
     MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
     ```
+
+    <Warning>
+      Never commit production credentials to your repository. Always use environment variables or secure secret management systems.
+    </Warning>
+
   </Step>
+
   <Step title="Install dependencies">
+    Install package dependencies with production optimizations:
+
     ```bash
     composer install --no-dev --optimize-autoloader
     ```
+
+    The `--no-dev` flag excludes development dependencies, and `--optimize-autoloader` improves class loading performance.
+
   </Step>
+
   <Step title="Verify package registration">
+    Confirm the package is properly registered:
+
     ```bash
     php artisan package:discover
     php artisan route:list --name=mercadopago
     ```
+
+    You should see the webhook route registered. Demo routes will not appear when `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`.
+
   </Step>
 </Steps>
 
+## Disabling Demo Routes
+
+<Warning>
+  **Critical:** Always disable demo routes in production to prevent unauthorized
+  access to MercadoPago operations.
+</Warning>
+
+Demo routes are automatically disabled in production when:
+
+1. `MERCADOPAGO_ENABLE_DEMO_ROUTES=false` in your `.env`
+2. `APP_ENV` is set to anything other than `local` or `testing`
+
+The middleware at `src/Http/Middleware/EnsureDemoRoutesEnabled.php:18-28` enforces this protection:
+
+```php
+if (
+    ! $this->config->get('mercadopago.enable_demo_routes', true)
+    || ! app()->environment(['local', 'testing'])
+) {
+    abort(404);
+}
+```
+
+Demo routes include:
+
+- `/api/mercadopago/health`
+- `/api/mercadopago/payment-methods`
+- `/api/mercadopago/preferences`
+- `/api/mercadopago/payments`
+- `/api/mercadopago/customers`
+- `/api/mercadopago/test-users`
+
+<Note>
+  The webhook route (`POST /api/mercadopago/webhooks`) remains active in all
+  environments as it's required for production operations.
+</Note>
+
 ## Cache Optimization
+
+Optimize Laravel's configuration and route caching for production performance:
 
 <Steps>
   <Step title="Clear existing caches">
@@ -46,47 +109,122 @@ description: "Deploy Laravel MercadoPago to production with recommended configur
     php artisan route:clear
     ```
   </Step>
+
   <Step title="Build production caches">
     ```bash
     php artisan config:cache
     php artisan route:cache
     php artisan view:cache
     ```
+
+    <Tip>
+      Configuration caching reads all config files once and creates a single cached file, significantly improving bootstrap performance.
+    </Tip>
+
+  </Step>
+
+  <Step title="Verify webhook accessibility">
+    Test that your webhook endpoint is publicly accessible:
+
+    ```bash
+    curl --request POST \
+      --url https://your-domain.com/api/mercadopago/webhooks \
+      --header 'Content-Type: application/json' \
+      --data '{"type":"payment","data":{"id":"123"}}'
+    ```
+
+    Expected response structure:
+
+    ```json
+    {
+      "ok": true,
+      "data": {
+        "acknowledged": true,
+        "validated": false,
+        "topic": "payment",
+        "resource": "123",
+        "payload": {...}
+      },
+      "meta": []
+    }
+    ```
+
+    <Warning>
+      If `validated` is `false`, your webhook secret is not configured. This is not recommended for production.
+    </Warning>
+
   </Step>
 </Steps>
 
+## Runtime Environment Configuration
+
+The package automatically configures the MercadoPago SDK runtime based on your Laravel environment:
+
+- **Local/Testing:** Uses `local` runtime mode
+- **Production:** Uses `server` runtime mode
+
+You can override this behavior with:
+
+```ini
+MERCADOPAGO_RUNTIME_ENVIRONMENT=server
+```
+
+<Note>
+  In most cases, you don't need to set this variable. The package selects the
+  appropriate runtime automatically.
+</Note>
+
 ## Production Deployment Checklist
+
+Use this checklist before deploying to production:
 
 <Steps>
   <Step title="Security configuration">
-    - `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`
-    - `MERCADOPAGO_WEBHOOK_SECRET` configured
-    - HTTPS enabled and enforced
-    - Production credentials stored securely
-    - No credentials committed to repository
+    - [ ] `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`
+    - [ ] `MERCADOPAGO_WEBHOOK_SECRET` configured
+    - [ ] HTTPS enabled and enforced
+    - [ ] Production credentials stored securely
+    - [ ] No credentials committed to repository
   </Step>
-  <Step title="Application setup">
-    - Dependencies installed with `--no-dev --optimize-autoloader`
-    - Configuration cached
-    - Routes cached
-    - Package discovery completed
-  </Step>
-  <Step title="MercadoPago configuration">
-    - Webhook URL registered in MercadoPago dashboard
-    - Webhook URL points to your HTTPS domain
-    - Webhook secret matches between MercadoPago and your `.env`
-    - Production credentials tested
+
+<Step title="Application setup">
+  - [ ] Dependencies installed with `--no-dev --optimize-autoloader` - [ ]
+  Configuration cached with `php artisan config:cache` - [ ] Routes cached with
+  `php artisan route:cache` - [ ] Package discovery completed
+</Step>
+
+<Step title="Monitoring and logging">
+  - [ ] Centralized logging configured - [ ] Error monitoring for `401`, `422`,
+  and `500` responses - [ ] Webhook endpoint monitoring active - [ ] Alert
+  system configured for payment failures
+</Step>
+
+<Step title="MercadoPago configuration">
+  - [ ] Webhook URL registered in MercadoPago dashboard - [ ] Webhook URL points
+  to your HTTPS domain - [ ] Webhook secret matches between MercadoPago and your
+  `.env` - [ ] Production credentials tested
+</Step>
+
+  <Step title="Business logic">
+    - [ ] Custom controllers implement authentication
+    - [ ] Authorization rules configured
+    - [ ] Payment state persistence implemented
+    - [ ] Webhook retry logic configured
+    - [ ] Edge cases handled (partial refunds, failed payments, etc.)
   </Step>
 </Steps>
 
 ## Testing Production Deployment
 
+After deployment, verify your setup:
+
 ### 1. Verify Demo Routes Are Disabled
 
 ```bash
 curl https://your-domain.com/api/mercadopago/health
-# Expected: 404 Not Found
 ```
+
+Expected: `404 Not Found`
 
 ### 2. Verify Webhook Is Active
 
@@ -94,34 +232,92 @@ curl https://your-domain.com/api/mercadopago/health
 curl --request POST \
   --url https://your-domain.com/api/mercadopago/webhooks \
   --header 'Content-Type: application/json' \
+  --header 'x-signature: v1=test,ts=12345' \
+  --header 'x-request-id: test-request' \
   --data '{"type":"payment","data":{"id":"123"}}'
-# Expected: 200 or 401
+```
+
+Expected: `200` or `401` (if signature validation is active)
+
+### 3. Trigger a Real Webhook
+
+Create a test payment through MercadoPago's interface and verify your webhook receives and processes the notification correctly.
+
+## Post-Deployment Operations
+
+### Configuration Updates
+
+When updating environment variables:
+
+```bash
+# After editing .env
+php artisan config:clear
+php artisan config:cache
+```
+
+### Package Updates
+
+When updating the package version:
+
+```bash
+composer update fitodac/laravel-mercadopago
+php artisan package:discover
+php artisan route:cache
 ```
 
 ## Troubleshooting Production Issues
 
 ### Demo Routes Still Accessible
 
-```bash
-php artisan config:clear
-php artisan config:cache
-```
+**Symptom:** Demo routes return `200` in production
+
+**Solution:**
+
+1. Verify `MERCADOPAGO_ENABLE_DEMO_ROUTES=false` in `.env`
+2. Verify `APP_ENV=production`
+3. Clear and rebuild config cache:
+   ```bash
+   php artisan config:clear
+   php artisan config:cache
+   ```
 
 ### Webhook Returns 422
 
-Verify `MERCADOPAGO_ACCESS_TOKEN` is set and clear config cache:
+**Symptom:** `Mercado Pago access token is not configured.`
+
+**Solution:**
+
+1. Verify `MERCADOPAGO_ACCESS_TOKEN` is set in `.env`
+2. Clear config cache:
+   ```bash
+   php artisan config:clear
+   ```
+3. Verify credentials are not expired
+
+### Package Routes Not Found
+
+**Symptom:** All MercadoPago routes return `404`
+
+**Solution:**
 
 ```bash
-php artisan config:clear
+composer dump-autoload
+php artisan package:discover
+php artisan route:cache
+php artisan route:list --name=mercadopago
 ```
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Security Best Practices" icon="shield" href="/deployment/security">
+  <Card
+    title="Security Best Practices"
+    icon="shield-check"
+    href="/deployment/security"
+  >
     Implement security measures for production
   </Card>
-  <Card title="Webhooks" icon="bell" href="/guides/handling-webhooks">
+  <Card title="Webhooks" icon="webhook" href="/guides/handling-webhooks">
     Handle webhook notifications properly
   </Card>
 </CardGroup>

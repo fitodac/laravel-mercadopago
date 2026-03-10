@@ -1,43 +1,95 @@
 ---
 title: "Testing"
 description: "Test your MercadoPago integration locally with demo routes and test users"
+icon: "flask"
 ---
 
 The package includes demo routes and utilities to help you test your integration without making real payments.
 
 ## Demo routes
 
-Demo routes are special endpoints that only work in `local` and `testing` environments.
+Demo routes are special endpoints that only work in `local` and `testing` environments. They're disabled automatically in production for security.
 
 ### Enabling demo routes
 
-```bash .env
+Set these environment variables:
+
+```ini
 APP_ENV=local
 MERCADOPAGO_ENABLE_DEMO_ROUTES=true
 ```
 
+<Note>
+  Demo routes automatically disable in production (`APP_ENV=production`)
+  regardless of the `ENABLE_DEMO_ROUTES` setting.
+</Note>
+
 ### Available demo routes
 
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/health` | Verify configuration |
-| `GET` | `/payment-methods` | List available payment methods |
-| `POST` | `/preferences` | Create payment preference |
-| `POST` | `/payments` | Create direct payment |
-| `GET` | `/payments/{id}` | Get payment details |
-| `POST` | `/payments/{id}/refunds` | Refund payment |
-| `POST` | `/customers` | Create customer |
-| `GET` | `/customers/{id}` | Get customer details |
-| `POST` | `/customers/{id}/cards` | Add card to customer |
-| `DELETE` | `/customers/{id}/cards/{cardId}` | Delete customer card |
-| `POST` | `/test-users` | Create test user |
+All routes use the configured prefix (default: `/api/mercadopago`):
+
+| Method   | Route                            | Purpose                        |
+| -------- | -------------------------------- | ------------------------------ |
+| `GET`    | `/health`                        | Verify configuration           |
+| `GET`    | `/payment-methods`               | List available payment methods |
+| `POST`   | `/preferences`                   | Create payment preference      |
+| `POST`   | `/payments`                      | Create direct payment          |
+| `GET`    | `/payments/{id}`                 | Get payment details            |
+| `POST`   | `/payments/{id}/refunds`         | Refund payment                 |
+| `POST`   | `/customers`                     | Create customer                |
+| `GET`    | `/customers/{id}`                | Get customer details           |
+| `POST`   | `/customers/{id}/cards`          | Add card to customer           |
+| `DELETE` | `/customers/{id}/cards/{cardId}` | Delete customer card           |
+| `POST`   | `/test-users`                    | Create test user               |
+
+### Verifying demo routes
+
+Check that routes are registered:
+
+```bash
+php artisan route:list --name=mercadopago
+```
+
+Expected output:
+
+```text
+GET|HEAD   api/mercadopago/health ................ mercadopago.health
+GET|HEAD   api/mercadopago/payment-methods ....... mercadopago.payment-methods.index
+POST       api/mercadopago/preferences ........... mercadopago.preferences.store
+POST       api/mercadopago/payments .............. mercadopago.payments.store
+GET|HEAD   api/mercadopago/payments/{paymentId} .. mercadopago.payments.show
+POST       api/mercadopago/payments/{id}/refunds . mercadopago.payments.refund
+POST       api/mercadopago/customers ............. mercadopago.customers.store
+GET|HEAD   api/mercadopago/customers/{id} ........ mercadopago.customers.show
+POST       api/mercadopago/customers/{id}/cards .. mercadopago.customers.cards.store
+DELETE     api/mercadopago/customers/{id}/cards/.. mercadopago.customers.cards.destroy
+POST       api/mercadopago/test-users ............ mercadopago.test-users.store
+POST       api/mercadopago/webhooks .............. mercadopago.webhooks.store
+```
 
 ## Testing with cURL
 
 ### Health check
 
+Verify credentials are configured:
+
 ```bash
 curl http://localhost:8000/api/mercadopago/health
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "configured": true,
+    "has_public_key": true,
+    "has_webhook_secret": true,
+    "environment": "local"
+  },
+  "meta": []
+}
 ```
 
 ### Create preference
@@ -47,8 +99,38 @@ curl --request POST \
   --url http://localhost:8000/api/mercadopago/preferences \
   --header 'Content-Type: application/json' \
   --data '{
-    "items": [{"title": "Test Product", "quantity": 1, "unit_price": 100}]
+    "items": [
+      {
+        "title": "Test Product",
+        "quantity": 1,
+        "unit_price": 100
+      }
+    ]
   }'
+```
+
+### Create payment
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/payments \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "transaction_amount": 100,
+    "token": "CARD_TOKEN",
+    "description": "Test payment",
+    "installments": 1,
+    "payment_method_id": "visa",
+    "payer": {
+      "email": "test@example.com"
+    }
+  }'
+```
+
+### Get payment
+
+```bash
+curl http://localhost:8000/api/mercadopago/payments/123456789
 ```
 
 ### Create refund
@@ -64,54 +146,166 @@ curl --request POST \
 curl --request POST \
   --url http://localhost:8000/api/mercadopago/payments/123456789/refunds \
   --header 'Content-Type: application/json' \
-  --data '{"amount": 50}'
+  --data '{ "amount": 50 }'
 ```
 
 ## Test users
 
-Create test users using the demo endpoint:
+MercadoPago provides test user accounts for integration testing. Create them using the demo endpoint:
 
 ```bash
 curl --request POST \
   --url http://localhost:8000/api/mercadopago/test-users \
   --header 'Content-Type: application/json' \
-  --data '{"site_id": "MLA", "description": "Test user for QA"}'
+  --data '{
+    "site_id": "MLA",
+    "description": "Test user for QA"
+  }'
 ```
 
 ### Supported site IDs
 
-| Site ID | Country |
-|---|---|
-| `MLA` | Argentina |
-| `MLB` | Brazil |
-| `MLC` | Chile |
-| `MLM` | Mexico |
-| `MLU` | Uruguay |
-| `MCO` | Colombia |
-| `MPE` | Peru |
+Create test users for different countries:
+
+| Site ID | Country   |
+| ------- | --------- |
+| `MLA`   | Argentina |
+| `MLB`   | Brazil    |
+| `MLC`   | Chile     |
+| `MLM`   | Mexico    |
+| `MLU`   | Uruguay   |
+| `MCO`   | Colombia  |
+| `MPE`   | Peru      |
+
+<Note>
+  Site ID validation is defined in `src/Http/Requests/CreateTestUserRequest.php`
+</Note>
+
+### Test user response
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": 123456789,
+    "nickname": "TESTUSER123456",
+    "password": "qatest1234",
+    "site_status": "active",
+    "email": "test_user_123456@testuser.com"
+  },
+  "meta": []
+}
+```
+
+Use these credentials to:
+
+- Log into MercadoPago's sandbox
+- Create test payments
+- Test checkout flows
 
 ## Testing webhooks locally
 
-Use tunneling services to expose your local server:
+Webhooks require a publicly accessible URL. Use tunneling services to expose your local server:
 
-```bash
-# Using ngrok
+<CodeGroup>
+```bash ngrok
 ngrok http 8000
 ```
 
+```bash expose
+expose share http://localhost:8000
+```
+
+```bash localtunnel
+lt --port 8000
+```
+
+</CodeGroup>
+
+You'll get a public URL like:
+
+```text
+https://abc123.ngrok.io
+```
+
+### Configure webhook URL
+
+Register your tunnel URL in MercadoPago:
+
+```text
+https://abc123.ngrok.io/api/mercadopago/webhooks
+```
+
+Or set it per preference/payment:
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/preferences \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "items": [...],
+    "notification_url": "https://abc123.ngrok.io/api/mercadopago/webhooks"
+  }'
+```
+
 ### Manual webhook simulation
+
+Test your webhook endpoint without MercadoPago:
 
 ```bash
 curl --request POST \
   --url http://localhost:8000/api/mercadopago/webhooks \
   --header 'Content-Type: application/json' \
   --header 'x-request-id: test-request-123' \
-  --data '{"type": "payment", "data": {"id": "123456789"}}'
+  --data '{
+    "type": "payment",
+    "data": {
+      "id": "123456789"
+    }
+  }'
 ```
+
+<Warning>
+  Without a valid signature, webhooks are marked as `validated: false`. For
+  production testing, ensure `MERCADOPAGO_WEBHOOK_SECRET` is configured.
+</Warning>
 
 ## Automated testing
 
+### Feature tests
+
+Test your integration with Laravel's HTTP testing:
+
+```php
+use Tests\TestCase;
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+
+class PreferenceTest extends TestCase
+{
+    public function test_creates_preference()
+    {
+        $response = $this->postJson('/api/mercadopago/preferences', [
+            'items' => [
+                [
+                    'title' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure([
+                'ok',
+                'data' => ['id', 'init_point'],
+            ]);
+    }
+}
+```
+
 ### Mocking services
+
+Mock MercadoPago services in tests:
 
 ```php
 use Fitodac\LaravelMercadoPago\Services\PaymentService;
@@ -124,25 +318,210 @@ public function test_processes_payment()
             ->andReturn([
                 'id' => 123456789,
                 'status' => 'approved',
+                'status_detail' => 'accredited',
             ]);
     });
 
-    $response = $this->postJson('/checkout/payment', [...]);
-    $response->assertStatus(201);
+    $response = $this->postJson('/checkout/payment', [
+        'amount' => 100,
+        'card_token' => 'CARD_TOKEN',
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJson(['status' => 'approved']);
 }
+```
+
+### Testing webhooks
+
+Test webhook handling:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+
+public function test_handles_webhook()
+{
+    $response = $this->postJson('/api/mercadopago/webhooks', [
+        'type' => 'payment',
+        'data' => ['id' => '123456789'],
+    ]);
+
+    $response->assertStatus(200)
+        ->assertJson(['ok' => true]);
+}
+
+public function test_validates_webhook_signature()
+{
+    config(['mercadopago.webhook_secret' => 'test-secret']);
+
+    $response = $this->postJson('/api/mercadopago/webhooks', [
+        'type' => 'payment',
+        'data' => ['id' => '123456789'],
+    ], [
+        'x-signature' => 'invalid',
+        'x-request-id' => 'test-123',
+    ]);
+
+    $response->assertStatus(401);
+}
+```
+
+## Testing strategies
+
+### Smoke tests
+
+Minimal tests to verify setup:
+
+```bash
+# 1. Check routes are registered
+php artisan route:list --name=mercadopago
+
+# 2. Verify configuration
+curl http://localhost:8000/api/mercadopago/health
+
+# 3. Test payment methods endpoint
+curl http://localhost:8000/api/mercadopago/payment-methods
+```
+
+### Integration tests
+
+Test full payment flows:
+
+<Steps>
+  <Step title="Create preference">
+    ```bash
+    curl -X POST http://localhost:8000/api/mercadopago/preferences \
+      -H 'Content-Type: application/json' \
+      -d '{"items": [{"title": "Test", "quantity": 1, "unit_price": 100}]}'
+    ```
+  </Step>
+
+<Step title="Open checkout URL">
+  Use the `sandbox_init_point` URL in a browser to complete test payment
+</Step>
+
+<Step title="Verify webhook">
+  Check your webhook endpoint receives notification
+</Step>
+
+  <Step title="Query payment status">
+    ```bash
+    curl http://localhost:8000/api/mercadopago/payments/PAYMENT_ID
+    ```
+  </Step>
+</Steps>
+
+### Test data
+
+Use consistent test data for reproducibility:
+
+```php
+class TestData
+{
+    public static function preference(): array
+    {
+        return [
+            'items' => [
+                [
+                    'title' => 'Test Product',
+                    'quantity' => 1,
+                    'unit_price' => 100.50,
+                ],
+            ],
+            'payer' => [
+                'email' => 'test@example.com',
+            ],
+            'external_reference' => 'TEST-' . time(),
+        ];
+    }
+
+    public static function payment(): array
+    {
+        return [
+            'transaction_amount' => 100.50,
+            'token' => 'CARD_TOKEN',
+            'description' => 'Test payment',
+            'installments' => 1,
+            'payment_method_id' => 'visa',
+            'payer' => [
+                'email' => 'test@example.com',
+            ],
+        ];
+    }
+}
+```
+
+## Test cards
+
+MercadoPago provides test card numbers. Consult their official documentation for:
+
+- Test card numbers that simulate approved payments
+- Test card numbers that simulate rejected payments
+- Test card numbers for different rejection reasons
+- CVV and expiration dates for testing
+
+<Warning>
+  Never use real card numbers in testing environments. Always use official test
+  cards provided by MercadoPago.
+</Warning>
+
+## Debugging
+
+### Enable query logging
+
+Log all API calls during testing:
+
+```php
+\Log::info('Creating payment', $payload);
+$payment = $paymentService->create($payload);
+\Log::info('Payment created', $payment);
+```
+
+### Check Laravel logs
+
+```bash
+tail -f storage/logs/laravel.log
+```
+
+### Verify environment
+
+Ensure correct environment configuration:
+
+```bash
+php artisan config:clear
+php artisan config:cache
+php artisan tinker
+>>> config('mercadopago.access_token')
+>>> config('mercadopago.enable_demo_routes')
+>>> app()->environment()
 ```
 
 ## Common testing issues
 
 ### 404 on demo routes
 
+**Cause**: Demo routes disabled in production or not enabled
+
+**Solution**:
+
 ```bash
+# Check environment
 php artisan tinker
 >>> app()->environment()  # Must be 'local' or 'testing'
 >>> config('mercadopago.enable_demo_routes')  # Must be true
 ```
 
+### Webhook returns 401
+
+**Cause**: Invalid signature validation
+
+**Solution**: Either configure valid `MERCADOPAGO_WEBHOOK_SECRET` or test without signature headers
+
 ### Routes not found
+
+**Cause**: Package not auto-discovered
+
+**Solution**:
 
 ```bash
 composer dump-autoload
@@ -151,13 +530,34 @@ php artisan route:clear
 php artisan route:cache
 ```
 
+## Production testing checklist
+
+Before deploying to production:
+
+- ✅ Demo routes are disabled (`ENABLE_DEMO_ROUTES=false`)
+- ✅ Production credentials configured
+- ✅ Webhook secret configured
+- ✅ HTTPS enabled
+- ✅ Webhook URL registered in MercadoPago
+- ✅ Error logging configured
+- ✅ Test payment processed successfully
+- ✅ Webhook received and processed
+- ✅ Refund tested
+
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Production Deployment" icon="server" href="/deployment/production">
-    Deploy securely to production
+  <Card title="Quickstart" icon="rocket" href="/guides/quickstart">
+    Get started with your first integration
   </Card>
-  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+  <Card
+    title="Handling Webhooks"
+    icon="webhook"
+    href="/guides/handling-webhooks"
+  >
     Set up production webhook handling
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/preference-service">
+    Explore all available services
   </Card>
 </CardGroup>

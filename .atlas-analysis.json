@@ -1,23 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Laravel MercadoPago",
+  "projectType": "sdk-library",
+  "projectName": "Laravel MercadoPago",
+  "projectDescription": "Laravel package for integrating Mercado Pago payment gateway with reusable services and demo endpoints",
   "theme": "palm",
-  "colors": {
-    "primary": "#009EE3",
-    "light": "#00B1EB",
-    "dark": "#0082C3"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/fitodac/laravel-mercadopago"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/fitodac/laravel-mercadopago"
-    }
-  },
+  "primaryColor": "#009EE3",
+  "lightColor": "#00B1EB",
+  "darkColor": "#0082C3",
   "navigation": {
     "tabs": [
       {
@@ -103,5 +91,39 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Laravel 12 auto-discovery integration",
+    "Reusable services for preferences, payments, refunds, customers, and cards",
+    "HMAC webhook signature validation",
+    "Demo JSON endpoints for development and testing",
+    "Environment-based configuration",
+    "Support for Mercado Pago SDK v3.8+",
+    "Test user creation for QA automation",
+    "Payment method listing"
+  ],
+  "publicApiSurface": [
+    "PreferenceService::create()",
+    "PaymentService::create()",
+    "PaymentService::get()",
+    "RefundService::create()",
+    "CustomerService::create()",
+    "CustomerService::get()",
+    "CardService::create()",
+    "CardService::delete()",
+    "PaymentMethodService::all()",
+    "WebhookService::handle()",
+    "TestUserService::create()",
+    "POST /api/mercadopago/preferences",
+    "POST /api/mercadopago/payments",
+    "GET /api/mercadopago/payments/{id}",
+    "POST /api/mercadopago/payments/{id}/refunds",
+    "POST /api/mercadopago/customers",
+    "GET /api/mercadopago/customers/{id}",
+    "POST /api/mercadopago/customers/{id}/cards",
+    "DELETE /api/mercadopago/customers/{customerId}/cards/{cardId}",
+    "POST /api/mercadopago/webhooks",
+    "GET /api/mercadopago/payment-methods",
+    "POST /api/mercadopago/test-users"
+  ]
 }

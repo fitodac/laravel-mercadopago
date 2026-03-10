@@ -1,0 +1,524 @@
+---
+title: "WebhookService"
+description: "API reference for handling and validating MercadoPago webhook notifications"
+icon: "webhook"
+---
+
+## Overview
+
+The `WebhookService` class handles incoming webhook notifications from MercadoPago, validates their authenticity using HMAC signature verification, and extracts relevant payment information.
+
+**Source**: `src/Services/WebhookService.php:13`
+
+<Info>
+  Webhooks are critical for reliable payment processing. They notify your
+  application of payment status changes even if users don't return to your site.
+</Info>
+
+## Constructor
+
+```php
+public function __construct(
+    private CredentialResolverInterface $credentialResolver,
+) {}
+```
+
+### Dependencies
+
+<ParamField
+  path="credentialResolver"
+  type="CredentialResolverInterface"
+  required
+>
+  Resolver for retrieving MercadoPago credentials including webhook secret.
+  Automatically injected by Laravel's service container.
+</ParamField>
+
+## Methods
+
+### handle()
+
+Processes and validates an incoming webhook request from MercadoPago.
+
+```php
+public function handle(Request $request): array
+```
+
+**Source**: `src/Services/WebhookService.php:19`
+
+#### Parameters
+
+<ParamField path="request" type="Illuminate\Http\Request" required>
+  The incoming HTTP request from MercadoPago containing: - Webhook payload in
+  request body - `x-signature` header for signature validation - `x-request-id`
+  header for request identification - Query parameters including `topic` and
+  `data.id`
+</ParamField>
+
+#### Returns
+
+<ResponseField name="response" type="array">
+  Processed webhook data:
+  <Expandable title="Return structure">
+    <ResponseField name="acknowledged" type="boolean">
+      Always `true` - indicates webhook was received
+    </ResponseField>
+
+    <ResponseField name="validated" type="boolean">
+      `true` if signature was validated, `false` if validation was skipped (no
+      secret configured)
+    </ResponseField>
+
+    <ResponseField name="topic" type="string">
+      Event type: `payment`, `merchant_order`, `subscription`, etc. Extracted
+      from `topic` query parameter or `type` field in payload.
+    </ResponseField>
+
+    <ResponseField name="resource" type="string">
+      Resource identifier (e.g., payment ID, order ID) Extracted from `data.id`
+      field in payload or query parameter.
+    </ResponseField>
+
+    <ResponseField name="payload" type="array">
+      Complete webhook payload from MercadoPago
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Throws
+
+<ResponseField name="InvalidWebhookSignatureException" type="exception">
+  Thrown when: - Signature header is malformed
+  (src/Services/WebhookService.php:75-76) - Computed signature doesn't match
+  provided signature (src/Services/WebhookService.php:57-59)
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller injection
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use Fitodac\LaravelMercadoPago\Exceptions\InvalidWebhookSignatureException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class WebhookController
+{
+public function store(
+Request $request,
+        WebhookService $webhookService
+    ): JsonResponse {
+        try {
+            $data = $webhookService->handle($request);
+
+            // Process based on topic
+            match ($data['topic']) {
+                'payment' => $this->handlePayment($data['resource']),
+                'merchant_order' => $this->handleOrder($data['resource']),
+                default => \Log::info('Unhandled webhook topic', $data),
+            };
+
+            return response()->json(['status' => 'processed']);
+
+        } catch (InvalidWebhookSignatureException $e) {
+            \Log::warning('Invalid webhook signature', [
+                'error' => $e->getMessage(),
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json(['error' => 'Invalid signature'], 401);
+        }
+    }
+
+    private function handlePayment(string $paymentId): void
+    {
+        // Retrieve payment details
+        $payment = app(\Fitodac\LaravelMercadoPago\Services\PaymentService::class)
+            ->get($paymentId);
+
+        // Update order status
+        $status = data_get($payment, 'status');
+        // ... update logic
+    }
+
+}
+
+````
+
+```php Route definition
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use Illuminate\Support\Facades\Route;
+
+Route::post('/webhooks/mercadopago', function (
+    Request $request,
+    WebhookService $service
+) {
+    $data = $service->handle($request);
+
+    \Log::info('MercadoPago webhook received', $data);
+
+    return response()->json(['acknowledged' => true]);
+});
+````
+
+```php Job dispatch
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use App\Jobs\ProcessMercadoPagoWebhook;
+
+public function store(Request $request, WebhookService $service)
+{
+    try {
+        $data = $service->handle($request);
+
+        // Dispatch job for async processing
+        ProcessMercadoPagoWebhook::dispatch($data);
+
+        return response()->json(['status' => 'queued']);
+
+    } catch (InvalidWebhookSignatureException $e) {
+        return response()->json(['error' => 'Invalid signature'], 401);
+    }
+}
+```
+
+</CodeGroup>
+
+## Signature Validation
+
+The service automatically validates webhook authenticity when a webhook secret is configured.
+
+### How validation works
+
+**Source**: `src/Services/WebhookService.php:38-60`
+
+1. Extract signature components from `x-signature` header:
+   - `ts`: Timestamp
+   - `v1`: HMAC-SHA256 hash
+
+2. Build manifest string:
+
+   ```
+   id:{resource_id};request-id:{request_id};ts:{timestamp};
+   ```
+
+3. Compute HMAC-SHA256 hash using webhook secret
+
+4. Compare computed hash with provided signature
+
+5. Throw `InvalidWebhookSignatureException` if mismatch
+
+### Configuration
+
+Signature validation requires webhook secret configuration:
+
+```php
+// config/mercadopago.php
+return [
+    'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
+    // ...
+];
+```
+
+```bash
+# .env
+MERCADOPAGO_WEBHOOK_SECRET=your-webhook-secret-from-mercadopago
+```
+
+<Warning>
+  If no webhook secret is configured, signature validation is skipped and
+  `validated` will be `false`. Always configure webhook secrets in production.
+</Warning>
+
+## Webhook Topics
+
+Common webhook topics you'll receive:
+
+| Topic            | Description            | Resource Type   |
+| ---------------- | ---------------------- | --------------- |
+| `payment`        | Payment status changed | Payment ID      |
+| `merchant_order` | Order status changed   | Order ID        |
+| `subscription`   | Subscription event     | Subscription ID |
+| `chargebacks`    | Chargeback occurred    | Chargeback ID   |
+
+### Handling different topics
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+$data = app(WebhookService::class)->handle($request);
+
+match ($data['topic']) {
+    'payment' => $this->processPaymentUpdate($data['resource']),
+    'merchant_order' => $this->processOrderUpdate($data['resource']),
+    'subscription' => $this->processSubscriptionUpdate($data['resource']),
+    default => \Log::info('Unhandled webhook', $data),
+};
+```
+
+## Common Patterns
+
+### Update payment status from webhook
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+use App\Models\Order;
+
+public function handleWebhook(Request $request)
+{
+    $data = app(WebhookService::class)->handle($request);
+
+    if ($data['topic'] === 'payment') {
+        // Fetch payment details
+        $payment = app(PaymentService::class)->get($data['resource']);
+
+        // Find order by external reference
+        $externalRef = data_get($payment, 'external_reference');
+        $order = Order::where('reference', $externalRef)->first();
+
+        if ($order) {
+            $order->update([
+                'status' => data_get($payment, 'status'),
+                'mercadopago_payment_id' => data_get($payment, 'id'),
+            ]);
+        }
+    }
+
+    return response()->json(['status' => 'ok']);
+}
+```
+
+### Idempotent webhook processing
+
+Prevent duplicate processing:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use App\Models\WebhookEvent;
+
+public function handleWebhook(Request $request)
+{
+    $data = app(WebhookService::class)->handle($request);
+
+    // Check if already processed
+    $exists = WebhookEvent::where([
+        'topic' => $data['topic'],
+        'resource_id' => $data['resource'],
+    ])->exists();
+
+    if ($exists) {
+        \Log::info('Duplicate webhook ignored', $data);
+        return response()->json(['status' => 'duplicate']);
+    }
+
+    // Store and process
+    WebhookEvent::create([
+        'topic' => $data['topic'],
+        'resource_id' => $data['resource'],
+        'payload' => $data['payload'],
+        'validated' => $data['validated'],
+        'processed_at' => now(),
+    ]);
+
+    // Process event
+    $this->processWebhookEvent($data);
+
+    return response()->json(['status' => 'processed']);
+}
+```
+
+### Async webhook processing
+
+Queue webhook processing for better performance:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use App\Jobs\ProcessMercadoPagoWebhook;
+
+public function handleWebhook(Request $request)
+{
+    try {
+        $data = app(WebhookService::class)->handle($request);
+
+        // Validate signature before queueing
+        if (!$data['validated']) {
+            \Log::warning('Unvalidated webhook received');
+        }
+
+        // Dispatch to queue
+        ProcessMercadoPagoWebhook::dispatch($data);
+
+        // Respond immediately
+        return response()->json(['status' => 'queued'], 202);
+
+    } catch (\Exception $e) {
+        \Log::error('Webhook handling failed', [
+            'error' => $e->getMessage(),
+        ]);
+
+        return response()->json(['error' => 'Processing failed'], 500);
+    }
+}
+```
+
+### Log all webhooks
+
+Maintain webhook audit trail:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+
+public function handleWebhook(Request $request)
+{
+    try {
+        $data = app(WebhookService::class)->handle($request);
+
+        \Log::channel('mercadopago')->info('Webhook received', [
+            'topic' => $data['topic'],
+            'resource' => $data['resource'],
+            'validated' => $data['validated'],
+            'ip' => $request->ip(),
+            'timestamp' => now()->toIso8601String(),
+        ]);
+
+        // Process webhook
+        // ...
+
+    } catch (InvalidWebhookSignatureException $e) {
+        \Log::channel('mercadopago')->error('Invalid webhook signature', [
+            'ip' => $request->ip(),
+            'error' => $e->getMessage(),
+        ]);
+
+        return response()->json(['error' => 'Invalid signature'], 401);
+    }
+}
+```
+
+## Security Considerations
+
+<Warning>
+  **Always validate webhook signatures in production.** Without validation,
+  malicious actors could send fake webhooks to manipulate your application.
+</Warning>
+
+### Best practices
+
+1. **Configure webhook secret**: Set `MERCADOPAGO_WEBHOOK_SECRET` in production
+2. **Reject unvalidated webhooks**: Return 401 for signature failures
+3. **Verify resource existence**: Fetch payment/order details from MercadoPago API
+4. **Implement idempotency**: Track processed webhooks to prevent duplicates
+5. **Log security events**: Monitor for validation failures
+6. **Use HTTPS**: MercadoPago requires HTTPS endpoints
+7. **Rate limiting**: Protect webhook endpoints from abuse
+
+### Example security implementation
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use Fitodac\LaravelMercadoPago\Exceptions\InvalidWebhookSignatureException;
+
+public function handleWebhook(Request $request)
+{
+    try {
+        $data = app(WebhookService::class)->handle($request);
+
+        // Enforce validation in production
+        if (app()->environment('production') && !$data['validated']) {
+            \Log::error('Production webhook without validation');
+            return response()->json(['error' => 'Signature required'], 401);
+        }
+
+        // Process webhook
+        // ...
+
+    } catch (InvalidWebhookSignatureException $e) {
+        // Log security event
+        \Log::warning('Webhook signature validation failed', [
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'timestamp' => now(),
+        ]);
+
+        return response()->json(['error' => 'Invalid signature'], 401);
+    }
+}
+```
+
+## Error Handling
+
+<ResponseField name="InvalidWebhookSignatureException" type="exception">
+  Thrown when: - **Malformed header**: Signature header missing `ts` or `v1`
+  components (src/Services/WebhookService.php:75-76) - **Signature mismatch**:
+  Computed signature doesn't match provided signature
+  (src/Services/WebhookService.php:57-59)
+</ResponseField>
+
+### Error handling example
+
+```php
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+use Fitodac\LaravelMercadoPago\Exceptions\InvalidWebhookSignatureException;
+
+try {
+    $data = app(WebhookService::class)->handle($request);
+
+    // Process webhook
+    $this->processWebhook($data);
+
+    return response()->json(['status' => 'processed']);
+
+} catch (InvalidWebhookSignatureException $e) {
+    // Log security event
+    \Log::warning('Invalid webhook signature', [
+        'message' => $e->getMessage(),
+        'ip' => $request->ip(),
+    ]);
+
+    return response()->json(['error' => 'Invalid signature'], 401);
+
+} catch (\Exception $e) {
+    // Log processing error
+    \Log::error('Webhook processing failed', [
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString(),
+    ]);
+
+    return response()->json(['error' => 'Processing failed'], 500);
+}
+```
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="PaymentService" icon="credit-card" href="/api/payment-service">
+    Retrieve payment details from webhooks
+  </Card>
+  <Card
+    title="PreferenceService"
+    icon="file-invoice"
+    href="/api/preference-service"
+  >
+    Link webhooks to preferences
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="Handling Webhooks Guide"
+    icon="book"
+    href="/guides/handling-webhooks"
+  >
+    Complete guide to webhook integration
+  </Card>
+  <Card
+    title="MercadoPago Webhook Documentation"
+    icon="link"
+    href="https://www.mercadopago.com/developers/en/docs/your-integrations/notifications/webhooks"
+  >
+    Official webhook documentation
+  </Card>
+</CardGroup>

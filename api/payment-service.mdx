@@ -1,0 +1,405 @@
+---
+title: "PaymentService"
+description: "API reference for processing direct payments and retrieving payment information"
+icon: "credit-card"
+---
+
+## Overview
+
+The `PaymentService` class handles direct payment processing with tokenized cards and payment status retrieval. This service allows you to create payments within your application without redirecting users to MercadoPago's checkout.
+
+**Source**: `src/Services/PaymentService.php:9`
+
+## Constructor
+
+```php
+public function __construct(
+    private MercadoPagoClientFactory $clientFactory,
+) {}
+```
+
+### Dependencies
+
+<ParamField path="clientFactory" type="MercadoPagoClientFactory" required>
+  Factory for creating and configuring MercadoPago SDK clients. Automatically
+  injected by Laravel's service container.
+</ParamField>
+
+## Methods
+
+### create()
+
+Creates a new payment using tokenized card data.
+
+```php
+public function create(array $payload): mixed
+```
+
+**Source**: `src/Services/PaymentService.php:15`
+
+#### Parameters
+
+<ParamField path="payload" type="array" required>
+  The payment configuration data.
+  <Expandable title="Payload structure">
+    <ParamField path="transaction_amount" type="numeric" required>
+      Payment amount (must be greater than 0)
+    </ParamField>
+
+    <ParamField path="token" type="string" required>
+      Card token obtained from MercadoPago.js SDK
+    </ParamField>
+
+    <ParamField path="description" type="string" required>
+      Payment description
+    </ParamField>
+
+    <ParamField path="installments" type="integer" required>
+      Number of payment installments (minimum 1)
+    </ParamField>
+
+    <ParamField path="payment_method_id" type="string" required>
+      Payment method identifier (e.g., "visa", "master", "amex")
+    </ParamField>
+
+    <ParamField path="issuer_id" type="integer">
+      Card issuer identifier
+    </ParamField>
+
+    <ParamField path="payer" type="array" required>
+      Payer information: - `email` (string, required): Payer's email address -
+      `identification` (array, optional): ID document details - `type` (string):
+      Document type (e.g., "DNI", "CPF") - `number` (string): Document number
+    </ParamField>
+
+    <ParamField path="external_reference" type="string">
+      Your internal order or transaction reference
+    </ParamField>
+
+    <ParamField path="notification_url" type="string">
+      Webhook URL for payment status notifications
+    </ParamField>
+
+    <ParamField path="metadata" type="array">
+      Custom key-value data for your application
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  MercadoPago payment object containing:
+  <Expandable title="Response structure">
+    <ResponseField name="id" type="integer">
+      Unique payment identifier
+    </ResponseField>
+
+    <ResponseField name="status" type="string">
+      Payment status: `approved`, `pending`, `in_process`, `rejected`,
+      `cancelled`, `refunded`, or `charged_back`
+    </ResponseField>
+
+    <ResponseField name="status_detail" type="string">
+      Detailed status reason (e.g., "accredited",
+      "cc_rejected_insufficient_amount")
+    </ResponseField>
+
+    <ResponseField name="transaction_amount" type="numeric">
+      Payment amount
+    </ResponseField>
+
+    <ResponseField name="currency_id" type="string">
+      Currency code (e.g., "ARS", "BRL")
+    </ResponseField>
+
+    <ResponseField name="description" type="string">
+      Payment description
+    </ResponseField>
+
+    <ResponseField name="payment_method_id" type="string">
+      Payment method used
+    </ResponseField>
+
+    <ResponseField name="payment_type_id" type="string">
+      Payment type (e.g., "credit_card", "debit_card")
+    </ResponseField>
+
+    <ResponseField name="installments" type="integer">
+      Number of installments
+    </ResponseField>
+
+    <ResponseField name="date_created" type="string">
+      ISO 8601 creation timestamp
+    </ResponseField>
+
+    <ResponseField name="date_approved" type="string">
+      ISO 8601 approval timestamp (null if not approved)
+    </ResponseField>
+
+    <ResponseField name="payer" type="object">
+      Payer information including email and identification
+    </ResponseField>
+
+    <ResponseField name="card" type="object">
+      Card details (first 6 digits, last 4 digits, cardholder info)
+    </ResponseField>
+
+    <ResponseField name="external_reference" type="string">
+      Your order reference
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller injection
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class PaymentController
+{
+public function store(
+Request $request,
+PaymentService $paymentService
+): JsonResponse {
+$payment = $paymentService->create([
+'transaction_amount' => 100.50,
+'token' => $request->card_token,
+'description' => 'Premium subscription',
+'installments' => 1,
+'payment_method_id' => 'visa',
+'payer' => [
+'email' => 'customer@example.com',
+],
+'external_reference' => 'ORDER-12345',
+'notification_url' => route('mercadopago.webhooks'),
+]);
+
+        if (data_get($payment, 'status') === 'approved') {
+            return response()->json([
+                'success' => true,
+                'payment_id' => data_get($payment, 'id'),
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'status' => data_get($payment, 'status'),
+            'detail' => data_get($payment, 'status_detail'),
+        ], 422);
+    }
+
+}
+
+````
+
+```php With error handling
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+try {
+    $payment = app(PaymentService::class)->create([
+        'transaction_amount' => 250.00,
+        'token' => $cardToken,
+        'description' => 'Order #1234',
+        'installments' => 3,
+        'payment_method_id' => 'visa',
+        'payer' => [
+            'email' => 'buyer@example.com',
+            'identification' => [
+                'type' => 'DNI',
+                'number' => '12345678',
+            ],
+        ],
+    ]);
+
+    // Handle payment status
+    match (data_get($payment, 'status')) {
+        'approved' => $this->handleApproved($payment),
+        'rejected' => $this->handleRejected($payment),
+        'pending', 'in_process' => $this->handlePending($payment),
+    };
+} catch (\Exception $e) {
+    \Log::error('Payment creation failed', [
+        'error' => $e->getMessage(),
+    ]);
+}
+````
+
+</CodeGroup>
+
+### get()
+
+Retrieves payment information by payment ID.
+
+```php
+public function get(string $paymentId): mixed
+```
+
+**Source**: `src/Services/PaymentService.php:24`
+
+#### Parameters
+
+<ParamField path="paymentId" type="string" required>
+  The unique payment identifier returned when the payment was created
+</ParamField>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  MercadoPago payment object with the same structure as the `create()` method
+  response. Contains current payment status and all payment details.
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller method
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+use Illuminate\Http\JsonResponse;
+
+public function show(
+string $paymentId,
+    PaymentService $paymentService
+): JsonResponse {
+    $payment = $paymentService->get($paymentId);
+
+    return response()->json([
+        'id' => data_get($payment, 'id'),
+        'status' => data_get($payment, 'status'),
+        'status_detail' => data_get($payment, 'status_detail'),
+        'amount' => data_get($payment, 'transaction_amount'),
+        'date_approved' => data_get($payment, 'date_approved'),
+    ]);
+
+}
+
+````
+
+```php Checking payment status
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+$service = app(PaymentService::class);
+$payment = $service->get('123456789');
+
+if (data_get($payment, 'status') === 'approved') {
+    // Update order status
+    Order::where('mercadopago_payment_id', $payment->id)
+        ->update(['status' => 'paid']);
+}
+````
+
+```php Route definition
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/payments/{id}', function (
+    string $id,
+    PaymentService $service
+) {
+    return response()->json($service->get($id));
+});
+```
+
+</CodeGroup>
+
+## Payment Statuses
+
+| Status         | Description                        |
+| -------------- | ---------------------------------- |
+| `approved`     | Payment approved and credited      |
+| `pending`      | Payment pending further processing |
+| `in_process`   | Payment is being reviewed          |
+| `rejected`     | Payment was rejected               |
+| `cancelled`    | Payment was cancelled              |
+| `refunded`     | Payment was refunded               |
+| `charged_back` | Payment was charged back           |
+
+### Common Status Details
+
+| Status Detail                          | Meaning                       |
+| -------------------------------------- | ----------------------------- |
+| `accredited`                           | Payment successfully credited |
+| `pending_contingency`                  | Pending review                |
+| `pending_review_manual`                | Manual review required        |
+| `cc_rejected_bad_filled_card_number`   | Invalid card number           |
+| `cc_rejected_bad_filled_date`          | Invalid expiration date       |
+| `cc_rejected_bad_filled_security_code` | Invalid CVV/security code     |
+| `cc_rejected_insufficient_amount`      | Insufficient funds            |
+| `cc_rejected_high_risk`                | Rejected by fraud prevention  |
+
+## Error Handling
+
+<ResponseField name="MercadoPagoConfigurationException" type="exception">
+  Thrown when: - MercadoPago SDK is not installed - Required SDK classes are not
+  found - SDK methods are unavailable
+</ResponseField>
+
+<ResponseField name="MercadoPagoException" type="exception">
+  Thrown by the MercadoPago SDK for API errors: - Invalid credentials - Invalid
+  payment data - Payment not found (for `get()` method) - Network errors
+</ResponseField>
+
+### Error handling example
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+
+try {
+    $payment = $paymentService->create($payload);
+
+    if (data_get($payment, 'status') === 'approved') {
+        // Success
+    }
+} catch (MercadoPagoConfigurationException $e) {
+    return response()->json(['error' => 'Service misconfigured'], 500);
+} catch (\Exception $e) {
+    \Log::error('Payment error', [
+        'message' => $e->getMessage(),
+        'payload' => $payload,
+    ]);
+    return response()->json(['error' => 'Payment processing failed'], 500);
+}
+```
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="RefundService" icon="rotate-left" href="/api/refund-service">
+    Refund approved payments
+  </Card>
+  <Card
+    title="PaymentMethodService"
+    icon="list"
+    href="/api/payment-method-service"
+  >
+    Get available payment methods
+  </Card>
+  <Card title="WebhookService" icon="webhook" href="/api/webhook-service">
+    Handle payment notifications
+  </Card>
+  <Card title="CustomerService" icon="users" href="/api/customer-service">
+    Manage customer data
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="Processing Payments Guide"
+    icon="book"
+    href="/guides/processing-payments"
+  >
+    Complete guide to payment processing
+  </Card>
+  <Card
+    title="MercadoPago API Documentation"
+    icon="link"
+    href="https://www.mercadopago.com/developers/en/reference/payments/_payments/post"
+  >
+    Official payments API reference
+  </Card>
+</CardGroup>

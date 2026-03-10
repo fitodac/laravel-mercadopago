@@ -1,137 +1,454 @@
 ---
-title: "Common Issues"
-description: "Solutions to frequently encountered problems when using the Laravel MercadoPago package"
+title: Common Issues
+description: Solutions to frequently encountered problems when using the Laravel MercadoPago package
 ---
 
 ## Configuration Issues
 
-<AccordionGroup>
-  <Accordion title="Mercado Pago access token is not configured">
-    **Error Message:**
-    ```
-    Mercado Pago access token is not configured.
-    ```
+<Accordion title="Mercado Pago access token is not configured">
+  **Error Message:**
+  ```
+  Mercado Pago access token is not configured.
+  ```
 
-    **Solution:**
-    1. Add the access token to your `.env` file:
-       ```bash
-       MERCADOPAGO_ACCESS_TOKEN=your_access_token_here
-       ```
-    2. Clear the configuration cache:
-       ```bash
-       php artisan config:clear
-       ```
-  </Accordion>
+**Cause:**
+The package cannot find the `MERCADOPAGO_ACCESS_TOKEN` environment variable.
 
-  <Accordion title="Package is installed but routes don't appear">
+**Solution:**
+
+1. Add the access token to your `.env` file:
+
+   ```ini
+   MERCADOPAGO_ACCESS_TOKEN=your_access_token_here
+   ```
+
+2. Clear the configuration cache:
+
+   ```bash
+   php artisan config:clear
+   ```
+
+3. Verify the configuration:
+   ```bash
+   curl http://localhost:8000/api/mercadopago/health
+   ```
+
+  <Warning>
+    Never commit your access token to version control. Keep it in `.env` and add `.env` to your `.gitignore`.
+  </Warning>
+</Accordion>
+
+<Accordion title="Package is installed but routes don't appear">
+  **Symptoms:**
+  - Running `php artisan route:list --name=mercadopago` shows no routes
+  - Requests to `/api/mercadopago/*` return 404
+
+**Solution:**
+
+1. Regenerate the package discovery cache:
+
+   ```bash
+   composer dump-autoload
+   php artisan package:discover
+   ```
+
+2. Clear the route cache:
+
+   ```bash
+   php artisan route:clear
+   ```
+
+3. Verify routes are registered:
+   ```bash
+   php artisan route:list --name=mercadopago
+   ```
+
+  <Note>
+    If using route caching in production, regenerate it with:
     ```bash
-    composer dump-autoload
-    php artisan package:discover
-    php artisan route:clear
-    php artisan route:list --name=mercadopago
+    php artisan route:cache
     ```
-  </Accordion>
-</AccordionGroup>
+  </Note>
+</Accordion>
 
 ## Demo Routes Issues
 
-<AccordionGroup>
-  <Accordion title="404 error on demo routes">
-    Demo routes only work when **both** conditions are met:
-    - `MERCADOPAGO_ENABLE_DEMO_ROUTES=true`
-    - Application environment is `local` or `testing`
+<Accordion title="404 error on demo routes">
+  **Error:**
+  Demo routes like `/api/mercadopago/health` or `/api/mercadopago/preferences` return 404.
 
-    ```bash .env
-    APP_ENV=local
-    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
-    ```
+**Cause:**
+Demo routes are protected by the `EnsureDemoRoutesEnabled` middleware and only work when **both** conditions are met:
 
-    Then clear configuration cache:
-    ```bash
-    php artisan config:clear
-    ```
-  </Accordion>
+- `MERCADOPAGO_ENABLE_DEMO_ROUTES=true`
+- Application environment is `local` or `testing`
 
-  <Accordion title="Route prefix conflicts">
-    Change the route prefix in your `.env`:
-    ```bash
-    MERCADOPAGO_ROUTE_PREFIX=api/payments/mercadopago
-    ```
-  </Accordion>
-</AccordionGroup>
+**Solution:**
+
+1. Check your `.env` file:
+
+   ```ini
+   APP_ENV=local
+   MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+   ```
+
+2. Clear configuration cache:
+
+   ```bash
+   php artisan config:clear
+   ```
+
+3. Verify the environment:
+   ```bash
+   php artisan env
+   ```
+
+<Warning>
+  In production (`APP_ENV=production`), demo routes are **always disabled**
+  regardless of the `ENABLE_DEMO_ROUTES` setting. This is a security feature.
+</Warning>
+
+**Alternative:**
+Create your own controllers that use the package services instead of relying on demo routes. See the [Quickstart](/guides/quickstart) guide for examples.
+
+</Accordion>
+
+<Accordion title="Route prefix conflicts with existing routes">
+  **Error:**
+  Routes conflict with your application's existing endpoints.
+
+**Solution:**
+
+Change the route prefix in your `.env`:
+
+```ini
+MERCADOPAGO_ROUTE_PREFIX=api/payments/mercadopago
+```
+
+Or publish and modify the configuration:
+
+```bash
+php artisan vendor:publish --tag=mercadopago-config
+```
+
+Then edit `config/mercadopago.php`:
+
+```php
+return [
+    'route_prefix' => env('MERCADOPAGO_ROUTE_PREFIX', 'api/payments/mp'),
+    // ...
+];
+```
+
+</Accordion>
 
 ## Webhook Issues
 
-<AccordionGroup>
-  <Accordion title="Webhook returns 401 Unauthorized">
-    ```json
-    {"ok": false, "message": "Mercado Pago webhook signature is invalid."}
-    ```
+<Accordion title="Webhook returns 401 Unauthorized">
+  **Error Message:**
+  ```json
+  {
+    "ok": false,
+    "message": "Mercado Pago webhook signature is invalid."
+  }
+  ```
 
-    Check:
-    1. `MERCADOPAGO_WEBHOOK_SECRET` matches Mercado Pago dashboard
-    2. Request includes `x-signature` and `x-request-id` headers
-    3. URL includes `data.id` in query string or payload
-  </Accordion>
+**Cause:**
+The webhook signature validation failed. This happens when:
 
-  <Accordion title="Webhook not receiving notifications">
-    1. Webhook URL must use HTTPS in production
-    2. For local development, use a tunnel service:
-       ```bash
-       ngrok http 8000
-       ```
-    3. Register the public URL in Mercado Pago dashboard
-  </Accordion>
-</AccordionGroup>
+- `MERCADOPAGO_WEBHOOK_SECRET` doesn't match the secret configured in Mercado Pago
+- Required headers are missing
+- The signature format is incorrect
+
+**Solution:**
+
+1. Verify your webhook secret matches Mercado Pago:
+
+   ```ini
+   MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret_here
+   ```
+
+2. Ensure Mercado Pago is sending these headers:
+   - `x-signature`: Contains `ts` and `v1` parameters
+   - `x-request-id`: Unique request identifier
+
+3. Verify the URL includes `data.id` in query string or payload:
+   ```
+   POST /api/mercadopago/webhooks?data.id=123456
+   ```
+
+<Note>
+  During local development, you can test webhooks without a secret. The package
+  will set `validated: false` but still process the payload.
+</Note>
+
+**Debugging signature validation:**
+
+The package validates signatures using this manifest:
+
+```
+id:{data.id};request-id:{x-request-id};ts:{timestamp};
+```
+
+Check your logs to see what values the package received.
+
+</Accordion>
+
+<Accordion title="Webhook signature header is malformed">
+  **Error Message:**
+  ```json
+  {
+    "ok": false,
+    "message": "Mercado Pago webhook signature header is malformed."
+  }
+  ```
+
+**Cause:**
+The `x-signature` header doesn't contain the required `ts` and `v1` parameters.
+
+**Expected format:**
+
+```
+x-signature: ts=1234567890,v1=abc123def456...
+```
+
+**Solution:**
+
+1. Verify you're receiving webhooks directly from Mercado Pago
+2. Check if a proxy or load balancer is modifying headers
+3. Ensure the webhook URL is configured correctly in Mercado Pago dashboard
+
+  <Warning>
+    If you're using a testing tool like Postman, make sure to format the header exactly as Mercado Pago sends it.
+  </Warning>
+</Accordion>
+
+<Accordion title="Webhook not receiving notifications">
+  **Problem:**
+  Mercado Pago isn't calling your webhook endpoint.
+
+**Solution:**
+
+1. Verify the webhook URL is publicly accessible:
+   - Must use HTTPS in production
+   - Must be reachable from Mercado Pago servers
+
+2. For local development, use a tunnel service:
+
+   ```bash
+   # Example with ngrok
+   ngrok http 8000
+   ```
+
+3. Configure the public URL in Mercado Pago:
+
+   ```
+   https://your-domain.com/api/mercadopago/webhooks
+   ```
+
+4. Test the endpoint manually:
+   ```bash
+   curl --request POST \
+     --url https://your-domain.com/api/mercadopago/webhooks \
+     --header 'Content-Type: application/json' \
+     --data '{"type":"payment","data":{"id":"123"}}'
+   ```
+
+  <Note>
+    You can also specify `notification_url` when creating preferences or payments to override the default webhook URL.
+  </Note>
+</Accordion>
 
 ## SDK and API Errors
 
-<AccordionGroup>
-  <Accordion title="Mercado Pago PHP SDK is not installed">
-    ```bash
-    composer require mercadopago/dx-php:^3.8
-    composer dump-autoload
-    php artisan config:clear
-    ```
-  </Accordion>
+<Accordion title="Mercado Pago PHP SDK is not installed">
+  **Error Message:**
+  ```
+  Mercado Pago PHP SDK is not installed.
+  ```
 
-  <Accordion title="422 Unprocessable Entity from Mercado Pago">
-    **Common causes:**
-    - Invalid payload structure
-    - Invalid email format
-    - Invalid amount
-    - Invalid payment method for your country
+**Solution:**
 
-    Validate your payload against the examples in the guides.
-  </Accordion>
+The package requires `mercadopago/dx-php`. Install it:
 
-  <Accordion title="401 Unauthorized from Mercado Pago API">
-    Invalid or expired access token. Verify credentials in MercadoPago dashboard and update your `.env`:
-    ```bash
-    MERCADOPAGO_ACCESS_TOKEN=APP-1234567890-VALID-TOKEN
-    ```
-  </Accordion>
-</AccordionGroup>
+```bash
+composer require mercadopago/dx-php:^3.8
+```
+
+Then clear caches:
+
+```bash
+composer dump-autoload
+php artisan config:clear
+```
+
+</Accordion>
+
+<Accordion title="SDK client class not found">
+  **Error Message:**
+  ```
+  No Mercado Pago SDK client class was found.
+  ```
+
+**Cause:**
+The package couldn't find the expected SDK client class.
+
+**Solution:**
+
+1. Verify the SDK version:
+
+   ```bash
+   composer show mercadopago/dx-php
+   ```
+
+2. Ensure you're using version `^3.8`:
+
+   ```bash
+   composer require mercadopago/dx-php:^3.8
+   ```
+
+3. Clear composer cache:
+   `bash
+     composer clear-cache
+     composer install
+     `
+   </Accordion>
+
+<Accordion title="422 Unprocessable Entity from Mercado Pago">
+  **Error:**
+  Mercado Pago API returns 422 when creating preferences or payments.
+
+**Common causes:**
+
+1. **Invalid payload structure** - Check the required fields in the [API Reference](/api/preference-service)
+2. **Invalid email format** - Ensure `payer.email` is valid
+3. **Invalid amount** - Must be positive and properly formatted
+4. **Invalid payment method** - Verify the payment method ID is valid for your country
+
+**Solution:**
+
+Validate your payload against the examples:
+
+```json
+{
+  "items": [
+    {
+      "title": "Product name",
+      "quantity": 1,
+      "unit_price": 100.5
+    }
+  ],
+  "payer": {
+    "email": "buyer@example.com"
+  }
+}
+```
+
+Enable debugging to see the exact error from Mercado Pago:
+
+```php
+Log::channel('daily')->info('MP Error', [
+    'payload' => $payload,
+    'response' => $exception->getMessage()
+]);
+```
+
+</Accordion>
+
+<Accordion title="401 Unauthorized from Mercado Pago API">
+  **Error:**
+  API requests return 401 Unauthorized.
+
+**Cause:**
+Invalid or expired access token.
+
+**Solution:**
+
+1. Verify your access token in Mercado Pago dashboard
+2. Ensure you're using the correct token for your environment:
+   - **Test mode:** Test access token
+   - **Production mode:** Production access token
+
+3. Update your `.env`:
+
+   ```ini
+   MERCADOPAGO_ACCESS_TOKEN=APP-1234567890-VALID-TOKEN
+   ```
+
+4. Clear configuration:
+   ```bash
+   php artisan config:clear
+   ```
+
+  <Warning>
+    Never mix test and production credentials. Use separate `.env` files for each environment.
+  </Warning>
+</Accordion>
 
 ## Testing Issues
 
-<AccordionGroup>
-  <Accordion title="Card token is invalid or expired">
-    Card tokens generated by MercadoPago.js expire after a short time. Generate the token immediately before creating the payment. Don't store tokens for later use.
-  </Accordion>
+<Accordion title="Test users endpoint not working">
+  **Problem:**
+  Cannot create test users via `/api/mercadopago/test-users`.
 
-  <Accordion title="Test users endpoint not working">
-    Ensure demo routes are enabled and use a valid `site_id`:
-    ```json
-    {"site_id": "MLA", "description": "Test user for QA"}
-    ```
+**Solution:**
 
-    Valid site IDs: `MLA`, `MLB`, `MLC`, `MLM`, `MLU`, `MCO`, `MPE`
-  </Accordion>
-</AccordionGroup>
+1. Ensure demo routes are enabled:
+
+   ```ini
+   APP_ENV=local
+   MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+   ```
+
+2. Use a valid `site_id`:
+   ```json
+   {
+     "site_id": "MLA",
+     "description": "Test user for QA"
+   }
+   ```
+
+Valid site IDs: `MLA`, `MLB`, `MLC`, `MLM`, `MLU`, `MCO`, `MPE`
+
+  <Note>
+    Test user creation requires a valid production access token, even in test mode.
+  </Note>
+</Accordion>
+
+<Accordion title="Card token is invalid or expired">
+  **Error:**
+  Payment creation fails with invalid card token.
+
+**Cause:**
+Card tokens generated by MercadoPago.js expire after a short time.
+
+**Solution:**
+
+1. Generate the token immediately before creating the payment
+2. Don't store tokens for later use
+3. Handle token expiration errors gracefully:
+   ```php
+   try {
+       $payment = $paymentService->create($payload);
+   } catch (Exception $e) {
+       if (str_contains($e->getMessage(), 'token')) {
+           return response()->json([
+               'error' => 'Card token expired. Please try again.'
+           ], 422);
+       }
+       throw $e;
+   }
+   ```
+
+For development, use test cards from the [Testing guide](/guides/testing).
+
+</Accordion>
 
 ## Need More Help?
 
+If your issue isn't listed here:
+
 1. Check the [Debugging guide](/troubleshooting/debugging) for diagnostic techniques
-2. Review the [GitHub issues](https://github.com/fitodac/laravel-mercadopago/issues)
-3. Consult the [official Mercado Pago documentation](https://www.mercadopago.com/developers)
+2. Enable detailed logging to capture error details
+3. Review the [GitHub issues](https://github.com/fitodac/laravel-mercadopago/issues) for similar problems
+4. Consult the [official Mercado Pago documentation](https://www.mercadopago.com/developers)

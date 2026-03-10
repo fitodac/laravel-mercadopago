@@ -1,6 +1,6 @@
 ---
-title: "Installation"
-description: "Install Laravel MercadoPago using Composer with local path repository or versioned package approaches."
+title: Installation
+description: Install Laravel MercadoPago using Composer with local path repository or versioned package approaches.
 ---
 
 ## Installation Methods
@@ -9,10 +9,12 @@ Laravel MercadoPago can be installed in two ways depending on your project struc
 
 <Tabs>
   <Tab title="Local Path Repository">
-    Use this method when the package lives within your repository or in a sibling directory. Ideal for monorepo setups or local development.
+    Use this method when the package lives within your repository or in a
+    sibling directory. Ideal for monorepo setups or local development.
   </Tab>
   <Tab title="Versioned Package">
-    Use this method when the package is available from a Composer registry, private repository, or VCS source.
+    Use this method when the package is available from a Composer registry,
+    private repository, or VCS source.
   </Tab>
 </Tabs>
 
@@ -24,7 +26,7 @@ This is the most direct approach when the package exists within your project str
   <Step title="Copy or clone the package">
     Place the package inside your Laravel project directory. A common convention is to use a `plugins/` or `packages/` folder:
 
-    ```
+    ```text
     my-laravel-app/
     ├── app/
     ├── config/
@@ -36,7 +38,9 @@ This is the most direct approach when the package exists within your project str
     │       └── composer.json
     └── composer.json
     ```
+
   </Step>
+
   <Step title="Register the local repository">
     Add the path repository configuration to your project's `composer.json`:
 
@@ -54,22 +58,42 @@ This is the most direct approach when the package exists within your project str
     }
     ```
 
+    <Note>
     The `symlink: true` option creates a symbolic link instead of copying files, allowing you to edit the package code directly.
+    </Note>
+
   </Step>
+
   <Step title="Install the package">
     Run Composer to require the package:
 
     ```bash
     composer require fitodac/laravel-mercadopago:^1.0
     ```
+
+    Composer will use the local path and install the package via symlink.
+
   </Step>
+
   <Step title="Verify auto-discovery">
     Confirm that Laravel has registered the package provider and routes:
 
     ```bash
     php artisan package:discover
+    ```
+
+    Check that routes are registered:
+
+    ```bash
     php artisan route:list --name=mercadopago
     ```
+
+    You should see routes like:
+    - `POST api/mercadopago/webhooks`
+    - `GET api/mercadopago/health` (demo route)
+    - `GET api/mercadopago/payment-methods` (demo route)
+    - And more...
+
   </Step>
 </Steps>
 
@@ -79,19 +103,30 @@ If your project has access to the package from a Composer registry, private repo
 
 <Steps>
   <Step title="Install via Composer">
+    Simply require the package with the desired version constraint:
+
     ```bash
     composer require fitodac/laravel-mercadopago:^1.0
     ```
+
   </Step>
+
   <Step title="Verify installation">
+    Confirm package discovery and route registration:
+
     ```bash
     php artisan package:discover
     php artisan route:list --name=mercadopago
     ```
 
-    With this method, you don't need the `repositories` section in your `composer.json`.
   </Step>
 </Steps>
+
+<Note>
+  With this method, you don't need the `repositories` section in your
+  `composer.json`. Composer will resolve the package from your configured
+  sources.
+</Note>
 
 ## Auto-Discovery
 
@@ -99,13 +134,13 @@ The package uses Laravel's [package auto-discovery](https://laravel.com/docs/pac
 
 ```json composer.json
 {
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Fitodac\\LaravelMercadoPago\\LaravelMercadoPagoServiceProvider"
-            ]
-        }
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fitodac\\LaravelMercadoPago\\LaravelMercadoPagoServiceProvider"
+      ]
     }
+  }
 }
 ```
 
@@ -116,12 +151,36 @@ This means **no manual provider registration** is required in your `config/app.p
 Once installed, the following services are available for dependency injection:
 
 <CodeGroup>
-
 ```php PreferenceService
 use Fitodac\LaravelMercadoPago\Services\PreferenceService;
 
+public function \_\_construct(
+private PreferenceService $preferenceService
+) {}
+
+````
+
+```php PaymentService
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
 public function __construct(
-    private PreferenceService $preferenceService
+    private PaymentService $paymentService
+) {}
+````
+
+```php CustomerService
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+public function __construct(
+    private CustomerService $customerService
+) {}
+```
+
+```php WebhookService
+use Fitodac\LaravelMercadoPago\Services\WebhookService;
+
+public function __construct(
+    private WebhookService $webhookService
 ) {}
 ```
 
@@ -147,13 +206,18 @@ After installation, verify everything is working correctly:
     ```bash
     php artisan package:discover
     ```
+    
+    Should output information about discovered packages including `fitodac/laravel-mercadopago`.
   </Step>
-  <Step title="List registered routes">
-    ```bash
-    php artisan route:list --name=mercadopago
-    ```
-  </Step>
+
+<Step title="List registered routes">
+  ```bash php artisan route:list --name=mercadopago ``` You should see the
+  webhook route and demo routes (if enabled).
+</Step>
+
   <Step title="Check autoloading (optional)">
+    If routes aren't appearing, regenerate the autoloader:
+    
     ```bash
     composer dump-autoload
     php artisan package:discover
@@ -165,6 +229,8 @@ After installation, verify everything is working correctly:
 ## Troubleshooting
 
 ### Routes not appearing
+
+If routes aren't registered after installation:
 
 ```bash
 composer dump-autoload
@@ -182,8 +248,14 @@ Demo routes are only available when:
 
 In production environments, demo routes are **always disabled** regardless of configuration.
 
+<Warning>
+  Demo routes are protected by the `mercadopago.demo` middleware and will return
+  `404` in production even if enabled in configuration.
+</Warning>
+
 ## Next Steps
 
 <Card title="Configuration" icon="gear" href="/configuration">
-  Configure environment variables, publish the config file, and set up your Mercado Pago credentials.
+  Configure environment variables, publish the config file, and set up your
+  Mercado Pago credentials.
 </Card>

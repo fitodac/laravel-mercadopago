@@ -1,0 +1,268 @@
+---
+title: "PreferenceService"
+description: "API reference for creating MercadoPago checkout preferences"
+icon: "file-invoice"
+---
+
+## Overview
+
+The `PreferenceService` class handles creation of payment preferences for MercadoPago's checkout experience. Preferences define the items being purchased, payment details, and redirect URLs.
+
+**Source**: `src/Services/PreferenceService.php:9`
+
+## Constructor
+
+```php
+public function __construct(
+    private MercadoPagoClientFactory $clientFactory,
+) {}
+```
+
+### Dependencies
+
+<ParamField path="clientFactory" type="MercadoPagoClientFactory" required>
+  Factory for creating and configuring MercadoPago SDK clients. Automatically
+  injected by Laravel's service container.
+</ParamField>
+
+## Methods
+
+### create()
+
+Creates a new payment preference in MercadoPago.
+
+```php
+public function create(array $payload): mixed
+```
+
+**Source**: `src/Services/PreferenceService.php:15`
+
+#### Parameters
+
+<ParamField path="payload" type="array" required>
+  The preference configuration data.
+  <Expandable title="Payload structure">
+    <ParamField path="items" type="array" required>
+      Array of items being purchased. Each item must contain: - `title` (string,
+      required): Item name - `quantity` (integer, required): Quantity -
+      `unit_price` (numeric, required): Unit price - `currency_id` (string,
+      optional): Currency code (e.g., "ARS") - `description` (string, optional):
+      Item description
+    </ParamField>
+
+    <ParamField path="payer" type="array">
+      Payer information: - `email` (string): Payer's email - `name` (string):
+      First name - `surname` (string): Last name - `phone` (array): Phone
+      details - `address` (array): Address details
+    </ParamField>
+
+    <ParamField path="back_urls" type="array">
+      Redirect URLs after payment: - `success` (string): URL for successful
+      payment - `pending` (string): URL for pending payment - `failure`
+      (string): URL for failed payment
+    </ParamField>
+
+    <ParamField path="notification_url" type="string">
+      Webhook URL for payment notifications
+    </ParamField>
+
+    <ParamField path="external_reference" type="string">
+      Your internal order or transaction reference
+    </ParamField>
+
+    <ParamField path="expires" type="boolean">
+      Enable preference expiration
+    </ParamField>
+
+    <ParamField path="expiration_date_from" type="string">
+      ISO 8601 date when preference becomes active
+    </ParamField>
+
+    <ParamField path="expiration_date_to" type="string">
+      ISO 8601 date when preference expires
+    </ParamField>
+
+    <ParamField path="metadata" type="array">
+      Custom key-value data for your application
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  MercadoPago preference object containing:
+  <Expandable title="Response structure">
+    <ResponseField name="id" type="string">
+      Unique preference identifier
+    </ResponseField>
+
+    <ResponseField name="init_point" type="string">
+      Production checkout URL
+    </ResponseField>
+
+    <ResponseField name="sandbox_init_point" type="string">
+      Sandbox/testing checkout URL
+    </ResponseField>
+
+    <ResponseField name="date_created" type="string">
+      ISO 8601 creation timestamp
+    </ResponseField>
+
+    <ResponseField name="items" type="array">
+      Array of preference items
+    </ResponseField>
+
+    <ResponseField name="payer" type="object">
+      Payer information
+    </ResponseField>
+
+    <ResponseField name="back_urls" type="object">
+      Redirect URLs configuration
+    </ResponseField>
+
+    <ResponseField name="external_reference" type="string">
+      Your order reference
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller injection
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class CheckoutController
+{
+public function store(
+Request $request,
+PreferenceService $preferenceService
+): JsonResponse {
+$preference = $preferenceService->create([
+'items' => [
+[
+'title' => 'Premium Subscription',
+'quantity' => 1,
+'unit_price' => 99.99,
+],
+],
+'payer' => [
+'email' => 'customer@example.com',
+],
+'back_urls' => [
+'success' => route('payment.success'),
+'pending' => route('payment.pending'),
+'failure' => route('payment.failure'),
+],
+'notification_url' => route('mercadopago.webhooks'),
+'external_reference' => 'ORDER-12345',
+]);
+
+        return response()->json([
+            'preference_id' => data_get($preference, 'id'),
+            'checkout_url' => data_get($preference, 'init_point'),
+        ]);
+    }
+
+}
+
+````
+
+```php Service container resolution
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+
+$service = app(PreferenceService::class);
+
+$preference = $service->create([
+    'items' => [
+        [
+            'title' => 'Product Name',
+            'quantity' => 2,
+            'unit_price' => 50.00,
+        ],
+    ],
+]);
+````
+
+```php Route closure
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Support\Facades\Route;
+
+Route::post('/checkout', function (
+    Request $request,
+    PreferenceService $service
+) {
+    $preference = $service->create($request->validated());
+    return response()->json($preference);
+});
+```
+
+</CodeGroup>
+
+## Error Handling
+
+The service may throw the following exceptions:
+
+<ResponseField name="MercadoPagoConfigurationException" type="exception">
+  Thrown when: - MercadoPago SDK is not installed - Required SDK classes are not
+  found - SDK methods are unavailable
+</ResponseField>
+
+<ResponseField name="MercadoPagoException" type="exception">
+  Thrown by the MercadoPago SDK for API errors: - Invalid credentials - Invalid
+  payload data - Network errors - API rate limits
+</ResponseField>
+
+### Error handling example
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+
+try {
+    $preference = $preferenceService->create($payload);
+} catch (MercadoPagoConfigurationException $e) {
+    \Log::error('MercadoPago configuration error', [
+        'message' => $e->getMessage(),
+    ]);
+    return response()->json(['error' => 'Service configuration error'], 500);
+} catch (\Exception $e) {
+    \Log::error('Preference creation failed', [
+        'message' => $e->getMessage(),
+        'payload' => $payload,
+    ]);
+    return response()->json(['error' => 'Preference creation failed'], 500);
+}
+```
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="PaymentService" icon="credit-card" href="/api/payment-service">
+    Process direct card payments
+  </Card>
+  <Card title="WebhookService" icon="webhook" href="/api/webhook-service">
+    Handle payment notifications
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="Creating Preferences Guide"
+    icon="book"
+    href="/guides/creating-preferences"
+  >
+    Comprehensive guide to preference creation
+  </Card>
+  <Card
+    title="MercadoPago API Documentation"
+    icon="link"
+    href="https://www.mercadopago.com/developers/en/reference/preferences/_checkout_preferences/post"
+  >
+    Official API reference
+  </Card>
+</CardGroup>

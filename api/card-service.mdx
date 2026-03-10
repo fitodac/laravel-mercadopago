@@ -1,0 +1,423 @@
+---
+title: "CardService"
+description: "API reference for managing customer payment methods (saved cards)"
+icon: "credit-card-front"
+---
+
+## Overview
+
+The `CardService` class handles creation and deletion of saved payment methods (cards) for MercadoPago customers. Saved cards allow customers to make payments without re-entering card details.
+
+**Source**: `src/Services/CardService.php:9`
+
+<Note>
+  Customer cards require an existing customer. Use
+  [CustomerService](/api/customer-service) to create customers first.
+</Note>
+
+## Constructor
+
+```php
+public function __construct(
+    private MercadoPagoClientFactory $clientFactory,
+) {}
+```
+
+### Dependencies
+
+<ParamField path="clientFactory" type="MercadoPagoClientFactory" required>
+  Factory for creating and configuring MercadoPago SDK clients. Automatically
+  injected by Laravel's service container.
+</ParamField>
+
+## Methods
+
+### create()
+
+Saves a tokenized card to a customer's account.
+
+```php
+public function create(string $customerId, array $payload): mixed
+```
+
+**Source**: `src/Services/CardService.php:15`
+
+#### Parameters
+
+<ParamField path="customerId" type="string" required>
+  The MercadoPago customer ID to associate the card with
+</ParamField>
+
+<ParamField path="payload" type="array" required>
+  The card configuration data.
+  <Expandable title="Payload structure">
+    <ParamField path="token" type="string" required>
+      Card token obtained from MercadoPago.js SDK using `mp.createCardToken()`
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Info>
+  The `token` parameter contains all card information (number, CVV, expiration,
+  holder name) securely tokenized by MercadoPago's frontend SDK. Never send raw
+  card data to your server.
+</Info>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  MercadoPago card object containing:
+  <Expandable title="Response structure">
+    <ResponseField name="id" type="string">
+      Unique card identifier (used for payments and deletion)
+    </ResponseField>
+
+    <ResponseField name="customer_id" type="string">
+      Associated customer ID
+    </ResponseField>
+
+    <ResponseField name="first_six_digits" type="string">
+      First 6 digits of the card (BIN)
+    </ResponseField>
+
+    <ResponseField name="last_four_digits" type="string">
+      Last 4 digits of the card
+    </ResponseField>
+
+    <ResponseField name="expiration_month" type="integer">
+      Card expiration month (1-12)
+    </ResponseField>
+
+    <ResponseField name="expiration_year" type="integer">
+      Card expiration year
+    </ResponseField>
+
+    <ResponseField name="date_created" type="string">
+      ISO 8601 creation timestamp
+    </ResponseField>
+
+    <ResponseField name="date_last_updated" type="string">
+      ISO 8601 last update timestamp
+    </ResponseField>
+
+    <ResponseField name="cardholder" type="object">
+      Cardholder information: - `name` (string): Name on card - `identification`
+      (object): ID document
+    </ResponseField>
+
+    <ResponseField name="payment_method" type="object">
+      Payment method details: - `id` (string): Payment method ID (e.g., "visa")
+      - `name` (string): Payment method name - `payment_type_id` (string): Type
+      (e.g., "credit_card")
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller injection
+use Fitodac\LaravelMercadoPago\Services\CardService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class CustomerCardController
+{
+public function store(
+Request $request,
+CardService $cardService
+): JsonResponse {
+$customerId = auth()->user()->mercadopago_customer_id;
+
+        $card = $cardService->create($customerId, [
+            'token' => $request->card_token,
+        ]);
+
+        return response()->json([
+            'card_id' => data_get($card, 'id'),
+            'last_four' => data_get($card, 'last_four_digits'),
+            'payment_method' => data_get($card, 'payment_method.id'),
+        ], 201);
+    }
+
+}
+
+````
+
+```php Save card after customer creation
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+// Create customer
+$customer = app(CustomerService::class)->create([
+    'email' => 'customer@example.com',
+    'first_name' => 'Ada',
+    'last_name' => 'Lovelace',
+]);
+
+$customerId = data_get($customer, 'id');
+
+// Save card for this customer
+$card = app(CardService::class)->create($customerId, [
+    'token' => $cardToken, // From MercadoPago.js
+]);
+
+$cardId = data_get($card, 'id');
+````
+
+```php Store multiple cards
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+$service = app(CardService::class);
+$customerId = auth()->user()->mercadopago_customer_id;
+
+$cards = [];
+foreach ($cardTokens as $token) {
+    $card = $service->create($customerId, ['token' => $token]);
+    $cards[] = [
+        'id' => data_get($card, 'id'),
+        'last_four' => data_get($card, 'last_four_digits'),
+    ];
+}
+```
+
+</CodeGroup>
+
+### delete()
+
+Removes a saved card from a customer's account.
+
+```php
+public function delete(string $customerId, string $cardId): mixed
+```
+
+**Source**: `src/Services/CardService.php:29`
+
+#### Parameters
+
+<ParamField path="customerId" type="string" required>
+  The MercadoPago customer ID that owns the card
+</ParamField>
+
+<ParamField path="cardId" type="string" required>
+  The card ID to delete (obtained from card creation)
+</ParamField>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  Deletion confirmation response from MercadoPago API
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller method
+use Fitodac\LaravelMercadoPago\Services\CardService;
+use Illuminate\Http\JsonResponse;
+
+public function destroy(
+string $cardId,
+CardService $cardService
+): JsonResponse {
+$customerId = auth()->user()->mercadopago_customer_id;
+
+    $cardService->delete($customerId, $cardId);
+
+    return response()->json([
+        'message' => 'Card removed successfully',
+    ]);
+
+}
+
+````
+
+```php Delete with verification
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+$service = app(CardService::class);
+$customerId = auth()->user()->mercadopago_customer_id;
+
+try {
+    $service->delete($customerId, $cardId);
+
+    // Update local database
+    PaymentMethod::where('mercadopago_card_id', $cardId)->delete();
+
+    return ['success' => true];
+} catch (\Exception $e) {
+    \Log::error('Card deletion failed', [
+        'customer_id' => $customerId,
+        'card_id' => $cardId,
+        'error' => $e->getMessage(),
+    ]);
+
+    return ['success' => false, 'error' => $e->getMessage()];
+}
+````
+
+```php Route definition
+use Fitodac\LaravelMercadoPago\Services\CardService;
+use Illuminate\Support\Facades\Route;
+
+Route::delete('/cards/{cardId}', function (
+    string $cardId,
+    CardService $service
+) {
+    $customerId = auth()->user()->mercadopago_customer_id;
+    $service->delete($customerId, $cardId);
+
+    return response()->json(['message' => 'Card deleted']);
+})->middleware('auth');
+```
+
+</CodeGroup>
+
+## Common Patterns
+
+### Save card during payment
+
+Allow customers to save their card while making a payment:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+// Process payment
+$payment = app(PaymentService::class)->create([
+    'transaction_amount' => 100,
+    'token' => $cardToken,
+    'description' => 'Premium subscription',
+    'installments' => 1,
+    'payment_method_id' => 'visa',
+    'payer' => ['email' => 'customer@example.com'],
+]);
+
+// If approved and customer wants to save
+if (data_get($payment, 'status') === 'approved' && $saveCard) {
+    $customerId = auth()->user()->mercadopago_customer_id;
+
+    app(CardService::class)->create($customerId, [
+        'token' => $cardToken,
+    ]);
+}
+```
+
+### List customer cards
+
+While this service doesn't provide a list method, you can retrieve the customer to see their cards:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+$customer = app(CustomerService::class)->get($customerId);
+$cards = data_get($customer, 'cards', []);
+
+foreach ($cards as $card) {
+    echo "Card ending in {$card['last_four_digits']}\n";
+}
+```
+
+### Sync cards to database
+
+Maintain a local copy of customer cards:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+$card = app(CardService::class)->create($customerId, [
+    'token' => $cardToken,
+]);
+
+// Store in local database
+auth()->user()->paymentMethods()->create([
+    'mercadopago_card_id' => data_get($card, 'id'),
+    'last_four' => data_get($card, 'last_four_digits'),
+    'brand' => data_get($card, 'payment_method.id'),
+    'expiration_month' => data_get($card, 'expiration_month'),
+    'expiration_year' => data_get($card, 'expiration_year'),
+]);
+```
+
+## Security Considerations
+
+<Warning>
+  **Never store or transmit raw card data (numbers, CVV, expiration dates)
+  through your server.** Always use MercadoPago.js to tokenize cards client-side
+  before sending to your backend.
+</Warning>
+
+### PCI Compliance
+
+By using card tokens:
+
+- Raw card data never touches your servers
+- You maintain PCI DSS compliance
+- MercadoPago handles secure card storage
+- Your scope of PCI compliance is minimized
+
+## Error Handling
+
+<ResponseField name="MercadoPagoConfigurationException" type="exception">
+  Thrown when: - MercadoPago SDK is not installed - Required SDK classes are not
+  found - SDK methods are unavailable
+</ResponseField>
+
+<ResponseField name="MercadoPagoException" type="exception">
+  Thrown by the MercadoPago SDK for API errors: - Invalid credentials - Invalid
+  card token - Customer not found - Card not found (for `delete()` method) -
+  Duplicate card - Network errors
+</ResponseField>
+
+### Error handling example
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+
+try {
+    $card = $cardService->create($customerId, $payload);
+} catch (MercadoPagoConfigurationException $e) {
+    return response()->json(['error' => 'Service misconfigured'], 500);
+} catch (\Exception $e) {
+    if (str_contains($e->getMessage(), 'customer not found')) {
+        return response()->json(['error' => 'Customer not found'], 404);
+    }
+
+    \Log::error('Card creation failed', [
+        'customer_id' => $customerId,
+        'error' => $e->getMessage(),
+    ]);
+
+    return response()->json(['error' => 'Card creation failed'], 500);
+}
+```
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="CustomerService" icon="users" href="/api/customer-service">
+    Create and manage customers
+  </Card>
+  <Card title="PaymentService" icon="credit-card" href="/api/payment-service">
+    Process payments with saved cards
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="Managing Customers Guide"
+    icon="book"
+    href="/guides/managing-customers"
+  >
+    Complete guide including card management
+  </Card>
+  <Card
+    title="MercadoPago API Documentation"
+    icon="link"
+    href="https://www.mercadopago.com/developers/en/reference/cards/_customers_customer_id_cards/post"
+  >
+    Official cards API reference
+  </Card>
+</CardGroup>

@@ -1,0 +1,412 @@
+---
+title: "CustomerService"
+description: "API reference for managing MercadoPago customer records"
+icon: "users"
+---
+
+## Overview
+
+The `CustomerService` class handles customer creation and retrieval in MercadoPago. Customers are used to store payer information and manage saved payment methods (cards).
+
+**Source**: `src/Services/CustomerService.php:9`
+
+## Constructor
+
+```php
+public function __construct(
+    private MercadoPagoClientFactory $clientFactory,
+) {}
+```
+
+### Dependencies
+
+<ParamField path="clientFactory" type="MercadoPagoClientFactory" required>
+  Factory for creating and configuring MercadoPago SDK clients. Automatically
+  injected by Laravel's service container.
+</ParamField>
+
+## Methods
+
+### create()
+
+Creates a new customer in MercadoPago.
+
+```php
+public function create(array $payload): mixed
+```
+
+**Source**: `src/Services/CustomerService.php:15`
+
+#### Parameters
+
+<ParamField path="payload" type="array" required>
+  The customer configuration data.
+  <Expandable title="Payload structure">
+    <ParamField path="email" type="string" required>
+      Customer's email address (must be valid email format)
+    </ParamField>
+
+    <ParamField path="first_name" type="string">
+      Customer's first name
+    </ParamField>
+
+    <ParamField path="last_name" type="string">
+      Customer's last name
+    </ParamField>
+
+    <ParamField path="phone" type="array">
+      Phone information: - `area_code` (string): Area code - `number` (string):
+      Phone number
+    </ParamField>
+
+    <ParamField path="identification" type="array">
+      Identification document: - `type` (string): Document type (e.g., "DNI",
+      "CPF", "CUIT") - `number` (string): Document number
+    </ParamField>
+
+    <ParamField path="address" type="array">
+      Customer address: - `zip_code` (string): Postal code - `street_name`
+      (string): Street name - `street_number` (integer): Street number
+    </ParamField>
+
+    <ParamField path="description" type="string">
+      Customer description or notes
+    </ParamField>
+
+    <ParamField path="metadata" type="array">
+      Custom key-value data for your application
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  MercadoPago customer object containing:
+  <Expandable title="Response structure">
+    <ResponseField name="id" type="string">
+      Unique customer identifier (used for card operations)
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      Customer's email address
+    </ResponseField>
+
+    <ResponseField name="first_name" type="string">
+      Customer's first name
+    </ResponseField>
+
+    <ResponseField name="last_name" type="string">
+      Customer's last name
+    </ResponseField>
+
+    <ResponseField name="phone" type="object">
+      Phone information
+    </ResponseField>
+
+    <ResponseField name="identification" type="object">
+      Identification document details
+    </ResponseField>
+
+    <ResponseField name="address" type="object">
+      Customer address
+    </ResponseField>
+
+    <ResponseField name="description" type="string">
+      Customer description
+    </ResponseField>
+
+    <ResponseField name="date_created" type="string">
+      ISO 8601 creation timestamp
+    </ResponseField>
+
+    <ResponseField name="date_last_updated" type="string">
+      ISO 8601 last update timestamp
+    </ResponseField>
+
+    <ResponseField name="metadata" type="object">
+      Custom metadata
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller injection
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class CustomerController
+{
+public function store(
+Request $request,
+CustomerService $customerService
+): JsonResponse {
+$customer = $customerService->create([
+'email' => $request->email,
+'first_name' => $request->first_name,
+'last_name' => $request->last_name,
+'phone' => [
+'area_code' => $request->area_code,
+'number' => $request->phone_number,
+],
+'identification' => [
+'type' => 'DNI',
+'number' => $request->dni,
+],
+'description' => 'Premium customer',
+'metadata' => [
+'user_id' => auth()->id(),
+'plan' => 'premium',
+],
+]);
+
+        // Store customer ID for future use
+        auth()->user()->update([
+            'mercadopago_customer_id' => data_get($customer, 'id'),
+        ]);
+
+        return response()->json([
+            'customer_id' => data_get($customer, 'id'),
+        ], 201);
+    }
+
+}
+
+````
+
+```php Link to User model
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+use App\Models\User;
+
+$user = User::find(1);
+
+if (!$user->mercadopago_customer_id) {
+    $service = app(CustomerService::class);
+
+    $customer = $service->create([
+        'email' => $user->email,
+        'first_name' => $user->first_name,
+        'last_name' => $user->last_name,
+        'metadata' => [
+            'user_id' => $user->id,
+        ],
+    ]);
+
+    $user->update([
+        'mercadopago_customer_id' => data_get($customer, 'id'),
+    ]);
+}
+````
+
+```php Simple creation
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+$service = app(CustomerService::class);
+
+$customer = $service->create([
+    'email' => 'customer@example.com',
+    'first_name' => 'Ada',
+    'last_name' => 'Lovelace',
+]);
+
+$customerId = data_get($customer, 'id');
+```
+
+</CodeGroup>
+
+### get()
+
+Retrieves customer information by customer ID.
+
+```php
+public function get(string $customerId): mixed
+```
+
+**Source**: `src/Services/CustomerService.php:24`
+
+#### Parameters
+
+<ParamField path="customerId" type="string" required>
+  The unique customer identifier returned when the customer was created
+</ParamField>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  MercadoPago customer object with the same structure as the `create()` method
+  response. Contains all customer information and metadata.
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Retrieve customer data
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+$service = app(CustomerService::class);
+
+$customerId = auth()->user()->mercadopago_customer_id;
+$customer = $service->get($customerId);
+
+$email = data_get($customer, 'email');
+$name = data_get($customer, 'first_name') . ' ' . data_get($customer, 'last_name');
+
+````
+
+```php Controller method
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+use Illuminate\Http\JsonResponse;
+
+public function show(
+    string $customerId,
+    CustomerService $customerService
+): JsonResponse {
+    $customer = $customerService->get($customerId);
+
+    return response()->json([
+        'id' => data_get($customer, 'id'),
+        'email' => data_get($customer, 'email'),
+        'name' => data_get($customer, 'first_name') . ' ' . data_get($customer, 'last_name'),
+        'created_at' => data_get($customer, 'date_created'),
+    ]);
+}
+````
+
+```php Verify customer exists
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+try {
+    $service = app(CustomerService::class);
+    $customer = $service->get($customerId);
+
+    // Customer exists
+    return true;
+} catch (\Exception $e) {
+    // Customer not found or error
+    return false;
+}
+```
+
+</CodeGroup>
+
+## Common Patterns
+
+### One customer per user
+
+Create a MercadoPago customer for each application user:
+
+```php
+// Add to User model
+public function getOrCreateMercadoPagoCustomer()
+{
+    if ($this->mercadopago_customer_id) {
+        return app(CustomerService::class)
+            ->get($this->mercadopago_customer_id);
+    }
+
+    $customer = app(CustomerService::class)->create([
+        'email' => $this->email,
+        'first_name' => $this->first_name,
+        'last_name' => $this->last_name,
+        'metadata' => [
+            'user_id' => $this->id,
+        ],
+    ]);
+
+    $this->update([
+        'mercadopago_customer_id' => data_get($customer, 'id'),
+    ]);
+
+    return $customer;
+}
+```
+
+### Customer with saved cards
+
+Customers are required for saving payment methods:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+use Fitodac\LaravelMercadoPago\Services\CardService;
+
+// Create customer first
+$customer = app(CustomerService::class)->create([
+    'email' => 'customer@example.com',
+    'first_name' => 'John',
+    'last_name' => 'Doe',
+]);
+
+$customerId = data_get($customer, 'id');
+
+// Then save card
+$card = app(CardService::class)->create($customerId, [
+    'token' => $cardToken,
+]);
+```
+
+## Error Handling
+
+<ResponseField name="MercadoPagoConfigurationException" type="exception">
+  Thrown when: - MercadoPago SDK is not installed - Required SDK classes are not
+  found - SDK methods are unavailable
+</ResponseField>
+
+<ResponseField name="MercadoPagoException" type="exception">
+  Thrown by the MercadoPago SDK for API errors: - Invalid credentials - Invalid
+  customer data - Customer not found (for `get()` method) - Duplicate customer -
+  Network errors
+</ResponseField>
+
+### Error handling example
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+
+try {
+    $customer = $customerService->create($payload);
+} catch (MercadoPagoConfigurationException $e) {
+    \Log::error('MercadoPago configuration error', [
+        'message' => $e->getMessage(),
+    ]);
+    return response()->json(['error' => 'Service misconfigured'], 500);
+} catch (\Exception $e) {
+    \Log::error('Customer creation failed', [
+        'message' => $e->getMessage(),
+        'payload' => $payload,
+    ]);
+    return response()->json(['error' => 'Customer creation failed'], 500);
+}
+```
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="CardService" icon="credit-card-front" href="/api/card-service">
+    Save and manage customer payment methods
+  </Card>
+  <Card title="PaymentService" icon="credit-card" href="/api/payment-service">
+    Process payments for customers
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="Managing Customers Guide"
+    icon="book"
+    href="/guides/managing-customers"
+  >
+    Complete guide to customer management
+  </Card>
+  <Card
+    title="MercadoPago API Documentation"
+    icon="link"
+    href="https://www.mercadopago.com/developers/en/reference/customers/_customers/post"
+  >
+    Official customers API reference
+  </Card>
+</CardGroup>

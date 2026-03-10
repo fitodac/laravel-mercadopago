@@ -1,0 +1,411 @@
+---
+title: "Customers API"
+description: "Manage customers and their saved payment cards"
+icon: "user"
+---
+
+## Overview
+
+The Customers API allows you to create and manage customer records in Mercado Pago, retrieve customer information, and manage their saved payment cards. This is useful for storing customer payment methods for future transactions.
+
+<Warning>
+  These endpoints are only available in `local` and `testing` environments when
+  `MERCADOPAGO_ENABLE_DEMO_ROUTES=true`. They are automatically disabled in
+  production.
+</Warning>
+
+## Create Customer
+
+Creates a new customer record in Mercado Pago.
+
+### Endpoint
+
+```
+POST /api/mercadopago/customers
+```
+
+### Request Parameters
+
+<ParamField path="email" type="string" required>
+  Customer email address. Must be a valid email format.
+</ParamField>
+
+<ParamField path="first_name" type="string">
+  Customer first name
+</ParamField>
+
+<ParamField path="last_name" type="string">
+  Customer last name
+</ParamField>
+
+<ParamField path="phone" type="object">
+  Customer phone information
+  <Expandable title="Phone properties">
+    <ParamField path="phone.area_code" type="string">
+      Phone area code
+    </ParamField>
+
+    <ParamField path="phone.number" type="string">
+      Phone number
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="identification" type="object">
+  Customer identification document
+  <Expandable title="Identification properties">
+    <ParamField path="identification.type" type="string">
+      Document type (e.g., "DNI", "CPF", "CUIT")
+    </ParamField>
+
+    <ParamField path="identification.number" type="string">
+      Document number
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="default_address" type="object">
+  Customer default address
+  <Expandable title="Address properties">
+    <ParamField path="default_address.zip_code" type="string">
+      ZIP/Postal code
+    </ParamField>
+
+    <ParamField path="default_address.street_name" type="string">
+      Street name
+    </ParamField>
+
+    <ParamField path="default_address.street_number" type="integer">
+      Street number
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="metadata" type="object">
+  Custom metadata object for additional information
+</ParamField>
+
+### Request Example
+
+```json
+{
+  "email": "buyer@example.com",
+  "first_name": "Ada",
+  "last_name": "Lovelace"
+}
+```
+
+### Response
+
+<ResponseField name="ok" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  The customer object returned by Mercado Pago
+  <Expandable title="Customer properties">
+    <ResponseField name="id" type="string">
+      Unique customer identifier
+    </ResponseField>
+
+    <ResponseField name="email" type="string">
+      Customer email
+    </ResponseField>
+
+    <ResponseField name="first_name" type="string">
+      Customer first name
+    </ResponseField>
+
+    <ResponseField name="last_name" type="string">
+      Customer last name
+    </ResponseField>
+
+    <ResponseField name="phone" type="object">
+      Customer phone information
+    </ResponseField>
+
+    <ResponseField name="identification" type="object">
+      Customer identification document
+    </ResponseField>
+
+    <ResponseField name="default_address" type="object">
+      Customer default address
+    </ResponseField>
+
+    <ResponseField name="date_created" type="string">
+      Customer creation timestamp
+    </ResponseField>
+
+    <ResponseField name="cards" type="array">
+      Array of saved cards for this customer
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="meta" type="array">
+  Additional metadata (typically empty)
+</ResponseField>
+
+### cURL Example
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/customers \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "email": "buyer@example.com",
+    "first_name": "Ada",
+    "last_name": "Lovelace"
+  }'
+```
+
+---
+
+## Get Customer
+
+Retrieves details of a specific customer.
+
+### Endpoint
+
+```
+GET /api/mercadopago/customers/{customerId}
+```
+
+### Path Parameters
+
+<ParamField path="customerId" type="string" required>
+  The unique identifier of the customer to retrieve
+</ParamField>
+
+### Response
+
+<ResponseField name="ok" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Complete customer object with all details including saved cards
+</ResponseField>
+
+### cURL Example
+
+```bash
+curl --request GET \
+  --url http://localhost:8000/api/mercadopago/customers/123456789
+```
+
+---
+
+## Add Card to Customer
+
+Adds a tokenized card to a customer's saved payment methods.
+
+### Endpoint
+
+```
+POST /api/mercadopago/customers/{customerId}/cards
+```
+
+### Path Parameters
+
+<ParamField path="customerId" type="string" required>
+  The unique identifier of the customer
+</ParamField>
+
+### Request Parameters
+
+<ParamField path="token" type="string" required>
+  Card token generated by Mercado Pago's tokenization service
+</ParamField>
+
+### Request Example
+
+```json
+{
+  "token": "CARD_TOKEN"
+}
+```
+
+### Response
+
+<ResponseField name="ok" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  The card object returned by Mercado Pago
+  <Expandable title="Card properties">
+    <ResponseField name="id" type="string">
+      Unique card identifier
+    </ResponseField>
+
+    <ResponseField name="customer_id" type="string">
+      ID of the customer who owns this card
+    </ResponseField>
+
+    <ResponseField name="first_six_digits" type="string">
+      First 6 digits of the card number
+    </ResponseField>
+
+    <ResponseField name="last_four_digits" type="string">
+      Last 4 digits of the card number
+    </ResponseField>
+
+    <ResponseField name="expiration_month" type="integer">
+      Card expiration month
+    </ResponseField>
+
+    <ResponseField name="expiration_year" type="integer">
+      Card expiration year
+    </ResponseField>
+
+    <ResponseField name="payment_method" type="object">
+      Payment method information
+    </ResponseField>
+
+    <ResponseField name="date_created" type="string">
+      Card creation timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### cURL Example
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/customers/123456789/cards \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "token": "CARD_TOKEN"
+  }'
+```
+
+---
+
+## Delete Customer Card
+
+Removes a saved card from a customer's payment methods.
+
+### Endpoint
+
+```
+DELETE /api/mercadopago/customers/{customerId}/cards/{cardId}
+```
+
+### Path Parameters
+
+<ParamField path="customerId" type="string" required>
+  The unique identifier of the customer
+</ParamField>
+
+<ParamField path="cardId" type="string" required>
+  The unique identifier of the card to delete
+</ParamField>
+
+### Response
+
+<ResponseField name="ok" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Confirmation object from Mercado Pago
+</ResponseField>
+
+### cURL Example
+
+```bash
+curl --request DELETE \
+  --url http://localhost:8000/api/mercadopago/customers/123456789/cards/987654321
+```
+
+### Error Response
+
+```json
+{
+  "ok": false,
+  "message": "Error message describing what went wrong"
+}
+```
+
+## Implementation Notes
+
+### Availability
+
+These endpoints are protected by the `mercadopago.demo` middleware and only respond when:
+
+- `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` in configuration
+- Application environment is `local` or `testing`
+
+In production or when demo routes are disabled, these endpoints return `404`.
+
+### Controller Reference
+
+Implemented in: `src/Http/Controllers/Api/CustomerController.php`
+
+- `store()` method: line 15
+- `show()` method: line 26
+- `storeCard()` method: line 35
+- `destroyCard()` method: line 47
+
+Request validation:
+
+- Customer creation: `src/Http/Requests/CreateCustomerRequest.php:16`
+- Card storage: `src/Http/Requests/StoreCustomerCardRequest.php:16`
+
+### Related Services
+
+- [CustomerService](/api/customer-service) - Service layer for customer operations
+- [CardService](/api/card-service) - Service layer for card operations
+
+### Related Guides
+
+- [Managing Customers](/guides/managing-customers) - Complete guide on customer management
+- [Saved Cards](/guides/managing-customers) - Working with saved payment methods
+
+## Best Practices
+
+<Tip>
+  **Production Usage**: For production environments, create your own controllers
+  that inject the `CustomerService` and `CardService` while implementing proper
+  authentication and authorization.
+</Tip>
+
+<Warning>
+  **Security**: Always validate that users can only access and modify their own
+  customer records. Implement proper authorization checks in your production
+  controllers.
+</Warning>
+
+<Note>
+  **Card Tokens**: Card tokens must be generated using Mercado Pago's
+  client-side tokenization. Never send raw card data through your server.
+</Note>
+
+### Example Production Controller
+
+```php
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+final class CustomerManagementController
+{
+    public function store(Request $request, CustomerService $customerService): JsonResponse
+    {
+        // Ensure user is authenticated
+        $user = $request->user();
+
+        $payload = $request->validate([
+            'email' => ['required', 'email'],
+            'first_name' => ['sometimes', 'string'],
+            'last_name' => ['sometimes', 'string'],
+        ]);
+
+        $customer = $customerService->create($payload);
+
+        // Save customer ID to your database associated with the user
+        $user->update(['mercadopago_customer_id' => $customer['id']]);
+
+        return response()->json($customer, 201);
+    }
+}
+```

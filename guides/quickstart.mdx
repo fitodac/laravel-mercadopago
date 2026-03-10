@@ -1,6 +1,7 @@
 ---
 title: "Quickstart"
 description: "Get your first MercadoPago payment working in minutes"
+icon: "rocket"
 ---
 
 This guide will walk you through installing the package, configuring credentials, and creating your first payment preference.
@@ -17,25 +18,43 @@ Before you begin, ensure you have:
 
 <Steps>
   <Step title="Install the package">
+    Add the package to your Laravel project using Composer:
+
     ```bash
     composer require fitodac/laravel-mercadopago:^1.0
     ```
 
     The package uses Laravel's auto-discovery, so the service provider will be registered automatically.
+
   </Step>
+
   <Step title="Verify package registration">
+    Confirm the package is installed and routes are registered:
+
     ```bash
     php artisan package:discover
     php artisan route:list --name=mercadopago
     ```
+
+    You should see routes like `mercadopago.preferences.store` and `mercadopago.webhooks.store`.
+
   </Step>
+
   <Step title="Publish configuration (optional)">
+    If you want to customize the configuration file:
+
     ```bash
     php artisan vendor:publish --tag=mercadopago-config
     ```
+
+    This creates `config/mercadopago.php` in your project.
+
   </Step>
+
   <Step title="Configure environment variables">
-    ```bash .env
+    Add your MercadoPago credentials to `.env`:
+
+    ```ini
     MERCADOPAGO_ACCESS_TOKEN=your_access_token_here
     MERCADOPAGO_PUBLIC_KEY=your_public_key_here
     MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret_here
@@ -43,10 +62,14 @@ Before you begin, ensure you have:
     ```
 
     <Warning>
-      Never commit real credentials to your repository.
+      Never commit real credentials to your repository. Keep them in `.env` and add `.env` to `.gitignore`.
     </Warning>
+
   </Step>
+
   <Step title="Test the configuration">
+    Verify your credentials are properly configured:
+
     ```bash
     curl http://localhost:8000/api/mercadopago/health
     ```
@@ -65,8 +88,12 @@ Before you begin, ensure you have:
       "meta": []
     }
     ```
+
   </Step>
+
   <Step title="Create your first preference">
+    Use the demo endpoint to create a payment preference:
+
     ```bash
     curl --request POST \
       --url http://localhost:8000/api/mercadopago/preferences \
@@ -81,11 +108,18 @@ Before you begin, ensure you have:
         ],
         "payer": {
           "email": "buyer@example.com"
-        }
+        },
+        "back_urls": {
+          "success": "https://your-app.test/payments/success",
+          "pending": "https://your-app.test/payments/pending",
+          "failure": "https://your-app.test/payments/failure"
+        },
+        "notification_url": "https://your-app.test/api/mercadopago/webhooks",
+        "external_reference": "order-1001"
       }'
     ```
 
-    Response:
+    You'll receive a response with:
 
     ```json
     {
@@ -98,6 +132,11 @@ Before you begin, ensure you have:
       "meta": []
     }
     ```
+
+    <Tip>
+      The `init_point` URL is where you redirect users to complete payment in production. Use `sandbox_init_point` for testing.
+    </Tip>
+
   </Step>
 </Steps>
 
@@ -140,13 +179,25 @@ final class CheckoutController
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Creating Preferences" icon="receipt" href="/guides/creating-preferences">
+  <Card
+    title="Creating Preferences"
+    icon="file-invoice"
+    href="/guides/creating-preferences"
+  >
     Learn about all preference options and customization
   </Card>
-  <Card title="Processing Payments" icon="credit-card" href="/guides/processing-payments">
+  <Card
+    title="Processing Payments"
+    icon="credit-card"
+    href="/guides/processing-payments"
+  >
     Process direct payments with tokenized cards
   </Card>
-  <Card title="Handling Webhooks" icon="bell" href="/guides/handling-webhooks">
+  <Card
+    title="Handling Webhooks"
+    icon="webhook"
+    href="/guides/handling-webhooks"
+  >
     Receive and validate payment notifications
   </Card>
   <Card title="Testing" icon="flask" href="/guides/testing">

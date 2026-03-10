@@ -1,31 +1,93 @@
 ---
-title: "Security Best Practices"
-description: "Secure your Laravel MercadoPago integration with authentication, HTTPS, and credential management"
+title: Security Best Practices
+description: Secure your Laravel MercadoPago integration with authentication, HTTPS, and credential management
 ---
 
-Security is critical when handling payment operations.
+Security is critical when handling payment operations. This guide covers essential security practices for the Laravel MercadoPago package.
+
+## Core Security Principles
 
 <Warning>
-  **Never commit credentials to your repository.** All sensitive data must be stored in environment variables or secure secret management systems.
+  **Never commit credentials to your repository.** All sensitive data must be
+  stored in environment variables or secure secret management systems.
 </Warning>
+
+The package requires three types of credentials:
+
+1. **Access Token** (required) - Authenticates SDK calls to MercadoPago
+2. **Public Key** (optional) - Used for frontend checkout integrations
+3. **Webhook Secret** (recommended) - Validates webhook signature authenticity
 
 ## Webhook Security
 
+Webhook security is critical to prevent fraudulent payment notifications.
+
 ### HMAC Signature Validation
 
-Configure your webhook secret:
+The package validates webhook signatures using HMAC-SHA256 when `MERCADOPAGO_WEBHOOK_SECRET` is configured.
 
-```bash .env
-MERCADOPAGO_WEBHOOK_SECRET=your_secret_from_mercadopago_dashboard
-```
+<Steps>
+  <Step title="Configure webhook secret">
+    Set your webhook secret in `.env`:
 
-The package validates signatures using HMAC-SHA256. The validation requires:
-- `x-signature` header with format `v1=hash,ts=timestamp`
-- `x-request-id` header
-- `data.id` parameter (query string or payload)
+    ```ini
+    MERCADOPAGO_WEBHOOK_SECRET=your_secret_from_mercadopago_dashboard
+    ```
+
+    Obtain this secret from your MercadoPago dashboard when configuring webhook notifications.
+
+  </Step>
+
+  <Step title="How signature validation works">
+    The `WebhookService` validates signatures at `src/Services/WebhookService.php:38-60`:
+
+    ```php
+    private function assertValidSignature(
+        Request $request,
+        array $payload,
+        string $secret,
+        string $signatureHeader,
+    ): void {
+        $signatureParts = $this->parseSignatureHeader($signatureHeader);
+        $resourceId = (string) ($request->query('data.id') ?? Arr::get($payload, 'data.id', ''));
+        $requestId = (string) $request->header('x-request-id', '');
+
+        $manifest = sprintf(
+            'id:%s;request-id:%s;ts:%s;',
+            $resourceId,
+            $requestId,
+            $signatureParts['ts'],
+        );
+
+        $computedHash = hash_hmac('sha256', $manifest, $secret);
+
+        if (! hash_equals($computedHash, $signatureParts['v1'])) {
+            throw InvalidWebhookSignatureException::signatureMismatch();
+        }
+    }
+    ```
+
+    The validation requires:
+    - `x-signature` header with format `v1=hash,ts=timestamp`
+    - `x-request-id` header
+    - `data.id` parameter (query string or payload)
+
+  </Step>
+
+  <Step title="Handle validation failures">
+    When signature validation fails, the endpoint returns `401 Unauthorized`.
+
+    Monitor for `401` responses as they indicate:
+    - Misconfigured webhook secret
+    - Potential security attacks
+    - Expired or malformed signatures
+
+  </Step>
+</Steps>
 
 <Warning>
-  **Never disable webhook signature validation in production.**
+  **Never disable webhook signature validation in production.** Always configure
+  `MERCADOPAGO_WEBHOOK_SECRET`.
 </Warning>
 
 ### Webhook Security Best Practices
@@ -36,11 +98,37 @@ The package validates signatures using HMAC-SHA256. The validation requires:
 4. **Implement idempotency** - Handle duplicate webhook deliveries gracefully
 5. **Log failed validations** - Monitor for potential security threats
 
+<Tip>
+  MercadoPago may send the same webhook multiple times. Always check if you've
+  already processed a payment before updating your database.
+</Tip>
+
 ## HTTPS Requirements
 
-HTTPS is mandatory for production. MercadoPago webhooks only work with HTTPS endpoints.
+<Warning>
+  **HTTPS is mandatory for production.** MercadoPago webhooks only work with
+  HTTPS endpoints.
+</Warning>
+
+### Why HTTPS Is Required
+
+1. **Credential protection** - Access tokens transmitted in requests must be encrypted
+2. **Webhook security** - MercadoPago validates SSL certificates before sending webhooks
+3. **PCI compliance** - Payment card industry standards require encrypted transmission
+4. **User trust** - Modern browsers warn users about insecure payment forms
+
+### HTTPS Configuration Checklist
+
+- [ ] Valid SSL certificate installed (not self-signed)
+- [ ] Certificate covers your domain (including subdomains if needed)
+- [ ] HTTP to HTTPS redirect configured
+- [ ] HSTS headers enabled
+- [ ] Mixed content warnings resolved
+- [ ] Webhook URL in MercadoPago dashboard uses `https://`
 
 ### Force HTTPS in Laravel
+
+Add to `App\Providers\AppServiceProvider`:
 
 ```php
 public function boot(): void
@@ -53,32 +141,172 @@ public function boot(): void
 
 ## Credential Management
 
+### Environment Variables
+
+Store all credentials in `.env` and never commit them:
+
+```ini
+# ❌ Never commit these values
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-1234567890abcdef-012345-1234567890abcdef1234567890abcdef-123456789
+MERCADOPAGO_PUBLIC_KEY=APP_USR-1234567890abcdef-012345-1234567890abcdef1234567890abcdef-123456789
+MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret_here
+```
+
+Ensure `.env` is listed in `.gitignore`:
+
+```text
+# .gitignore
+.env
+.env.backup
+.env.production
+```
+
+### Credential Resolution
+
+The package resolves credentials at `src/Support/EnvCredentialResolver.php:18-34`:
+
+```php
+public function resolve(): MercadoPagoCredentials
+{
+    $accessToken = (string) $this->config->get('mercadopago.access_token', '');
+
+    if ($accessToken === '') {
+        throw MercadoPagoConfigurationException::missingAccessToken();
+    }
+
+    $publicKey = $this->config->get('mercadopago.public_key');
+    $webhookSecret = $this->config->get('mercadopago.webhook_secret');
+
+    return new MercadoPagoCredentials(
+        accessToken: $accessToken,
+        publicKey: is_string($publicKey) && $publicKey !== '' ? $publicKey : null,
+        webhookSecret: is_string($webhookSecret) && $webhookSecret !== '' ? $webhookSecret : null,
+    );
+}
+```
+
+<Note>
+  The access token is **required**. The package throws
+  `MercadoPagoConfigurationException` if it's missing.
+</Note>
+
 ### Credential Rotation
+
+When rotating credentials:
 
 <Steps>
   <Step title="Generate new credentials">
     Create new credentials in your MercadoPago dashboard.
   </Step>
+
   <Step title="Update environment variables">
-    ```bash .env
+    Update `.env` with new credentials:
+
+    ```ini
     MERCADOPAGO_ACCESS_TOKEN=new_access_token
+    MERCADOPAGO_PUBLIC_KEY=new_public_key
     MERCADOPAGO_WEBHOOK_SECRET=new_webhook_secret
     ```
+
   </Step>
-  <Step title="Clear configuration cache">
+
+<Step title="Clear configuration cache">
+  ```bash php artisan config:clear php artisan config:cache ```
+</Step>
+
+  <Step title="Verify connectivity">
+    Test with a safe operation:
+
     ```bash
-    php artisan config:clear
-    php artisan config:cache
+    # In local/testing environment
+    curl http://localhost:8000/api/mercadopago/payment-methods
     ```
+
   </Step>
+
   <Step title="Revoke old credentials">
     After verifying the new credentials work, revoke the old ones in your MercadoPago dashboard.
   </Step>
 </Steps>
 
+### Secrets Management Services
+
+For production environments, consider using dedicated secrets management:
+
+- **AWS Secrets Manager**
+- **HashiCorp Vault**
+- **Azure Key Vault**
+- **Google Secret Manager**
+
+Example with Laravel and AWS Secrets Manager:
+
+```php
+// config/mercadopago.php
+use Illuminate\Support\Facades\Cache;
+
+return [
+    'access_token' => env('APP_ENV') === 'production'
+        ? Cache::remember('mercadopago.access_token', 3600, fn() =>
+            app(\Aws\SecretsManager\SecretsManagerClient::class)
+                ->getSecretValue(['SecretId' => 'mercadopago/access_token'])
+                ['SecretString']
+        )
+        : env('MERCADOPAGO_ACCESS_TOKEN'),
+    // ...
+];
+```
+
+## Demo Routes Protection
+
+<Warning>
+  Demo routes are for development only. They expose direct access to MercadoPago
+  operations without authentication.
+</Warning>
+
+### How Demo Routes Are Protected
+
+The middleware at `src/Http/Middleware/EnsureDemoRoutesEnabled.php:18-28` enforces protection:
+
+```php
+public function handle(Request $request, Closure $next): Response
+{
+    if (
+        ! $this->config->get('mercadopago.enable_demo_routes', true)
+        || ! app()->environment(['local', 'testing'])
+    ) {
+        abort(404);
+    }
+
+    return $next($request);
+}
+```
+
+Demo routes are disabled when:
+
+1. `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`
+2. `APP_ENV` is not `local` or `testing`
+
+### Production Configuration
+
+Always disable demo routes in production:
+
+```ini
+APP_ENV=production
+MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+```
+
+<Tip>
+  Even with `MERCADOPAGO_ENABLE_DEMO_ROUTES=true`, demo routes automatically
+  return `404` in production environments.
+</Tip>
+
 ## Custom Controller Security
 
+The package recommends implementing your own controllers with proper security:
+
 ### Authentication
+
+Protect your payment endpoints with Laravel's authentication:
 
 ```php
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -88,11 +316,35 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 ### Authorization
 
+Implement authorization policies for payment operations:
+
 ```php
-Gate::authorize('create-payment', $request->user());
+use Illuminate\Support\Facades\Gate;
+
+public function store(Request $request, PreferenceService $preferenceService)
+{
+    Gate::authorize('create-payment', $request->user());
+
+    // Create preference...
+}
+```
+
+### Input Validation
+
+Always validate user input before creating payments:
+
+```php
+$validated = $request->validate([
+    'items' => ['required', 'array', 'min:1'],
+    'items.*.title' => ['required', 'string', 'max:255'],
+    'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
+    'items.*.unit_price' => ['required', 'numeric', 'min:0.01'],
+]);
 ```
 
 ### Rate Limiting
+
+Protect payment endpoints from abuse:
 
 ```php
 Route::middleware(['throttle:10,1'])->group(function () {
@@ -100,51 +352,132 @@ Route::middleware(['throttle:10,1'])->group(function () {
 });
 ```
 
-## Security Don'ts
+## Security Recommendations
 
-- ❌ Commit credentials to Git
-- ❌ Share access tokens or webhook secrets
-- ❌ Expose demo routes in production
-- ❌ Use HTTP for webhook endpoints
-- ❌ Skip webhook signature validation
-- ❌ Trust webhook data without verification
-- ❌ Store credentials in frontend code
-
-## Security Do's
-
-- ✅ Store credentials in environment variables
-- ✅ Enable HTTPS with valid certificates
-- ✅ Configure webhook secrets
-- ✅ Validate webhook signatures
-- ✅ Disable demo routes in production
-- ✅ Implement custom controllers with authentication
-- ✅ Validate all user input
-- ✅ Apply rate limiting
-- ✅ Rotate credentials periodically
-
-## Incident Response
+### Production Checklist
 
 <Steps>
-  <Step title="Immediate actions">
-    1. Revoke compromised credentials in MercadoPago dashboard
-    2. Review recent payment transactions for anomalies
-    3. Check application logs for suspicious activity
+  <Step title="Credentials">
+    - [ ] Access token stored in environment variables
+    - [ ] Public key stored in environment variables
+    - [ ] Webhook secret configured and validated
+    - [ ] No credentials in version control
+    - [ ] Credentials rotated regularly
   </Step>
-  <Step title="Remediation">
-    1. Generate new credentials
-    2. Update environment variables
-    3. Deploy configuration changes
-    4. Monitor for continued suspicious activity
+
+<Step title="Network security">
+  - [ ] HTTPS enabled and enforced - [ ] Valid SSL certificate installed - [ ]
+  HTTP to HTTPS redirect configured - [ ] Webhook URL uses HTTPS - [ ] HSTS
+  headers enabled
+</Step>
+
+<Step title="Application security">
+  - [ ] Demo routes disabled (`MERCADOPAGO_ENABLE_DEMO_ROUTES=false`) - [ ]
+  Custom controllers implement authentication - [ ] Authorization policies
+  configured - [ ] Input validation on all endpoints - [ ] Rate limiting enabled
+</Step>
+
+<Step title="Webhook security">
+  - [ ] Webhook secret configured - [ ] Signature validation active - [ ] Failed
+  validations logged - [ ] Idempotency implemented - [ ] Resource verification
+  before processing
+</Step>
+
+  <Step title="Monitoring">
+    - [ ] Centralized logging configured
+    - [ ] `401` errors monitored (failed webhook validations)
+    - [ ] `422` errors monitored (configuration issues)
+    - [ ] `500` errors monitored (application errors)
+    - [ ] Alert system for anomalies
   </Step>
 </Steps>
 
-## Next Steps
+### Security Don'ts
+
+❌ **Never do this:**
+
+- Commit credentials to Git
+- Share access tokens or webhook secrets
+- Expose demo routes in production
+- Use HTTP for webhook endpoints
+- Skip webhook signature validation
+- Trust webhook data without verification
+- Store credentials in frontend code
+- Use self-signed SSL certificates in production
+- Implement payment logic without authentication
+- Allow unlimited payment attempts
+
+### Security Do's
+
+✅ **Always do this:**
+
+- Store credentials in environment variables
+- Enable HTTPS with valid certificates
+- Configure webhook secrets
+- Validate webhook signatures
+- Disable demo routes in production
+- Implement custom controllers with authentication
+- Validate all user input
+- Apply rate limiting
+- Log security events
+- Monitor for unusual activity
+- Rotate credentials periodically
+- Verify payments with MercadoPago API
+
+## Incident Response
+
+If you suspect a security incident:
+
+<Steps>
+  <Step title="Immediate actions">
+    1. Revoke compromised credentials immediately in MercadoPago dashboard
+    2. Review recent payment transactions for anomalies
+    3. Check application logs for suspicious activity
+    4. Disable affected endpoints if necessary
+  </Step>
+
+<Step title="Investigation">
+  1. Identify the scope of the breach 2. Determine which credentials were
+  exposed 3. Review access logs and error logs 4. Document the timeline of
+  events
+</Step>
+
+<Step title="Remediation">
+  1. Generate new credentials 2. Update environment variables 3. Deploy
+  configuration changes 4. Verify new credentials work correctly 5. Monitor for
+  continued suspicious activity
+</Step>
+
+  <Step title="Post-incident">
+    1. Review security practices
+    2. Implement additional safeguards
+    3. Update documentation
+    4. Train team on security best practices
+  </Step>
+</Steps>
+
+## Additional Resources
 
 <CardGroup cols={2}>
-  <Card title="Production Deployment" icon="server" href="/deployment/production">
+  <Card
+    title="Production Deployment"
+    icon="server"
+    href="/deployment/production"
+  >
     Deploy your application to production
   </Card>
-  <Card title="Webhook Handling" icon="bell" href="/guides/handling-webhooks">
+  <Card
+    title="Webhook Handling"
+    icon="webhook"
+    href="/guides/handling-webhooks"
+  >
     Process webhook notifications securely
+  </Card>
+  <Card
+    title="MercadoPago Security"
+    icon="external-link"
+    href="https://www.mercadopago.com/developers/en/docs/security"
+  >
+    Official MercadoPago security documentation
   </Card>
 </CardGroup>

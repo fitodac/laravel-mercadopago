@@ -1,0 +1,427 @@
+---
+title: "PaymentMethodService"
+description: "API reference for retrieving available payment methods"
+icon: "list"
+---
+
+## Overview
+
+The `PaymentMethodService` class retrieves all available payment methods for your MercadoPago account. This includes credit cards, debit cards, and other payment types accepted in your configured countries.
+
+**Source**: `src/Services/PaymentMethodService.php:9`
+
+<Info>
+  Available payment methods depend on your MercadoPago account configuration,
+  supported countries, and enabled payment types.
+</Info>
+
+## Constructor
+
+```php
+public function __construct(
+    private MercadoPagoClientFactory $clientFactory,
+) {}
+```
+
+### Dependencies
+
+<ParamField path="clientFactory" type="MercadoPagoClientFactory" required>
+  Factory for creating and configuring MercadoPago SDK clients. Automatically
+  injected by Laravel's service container.
+</ParamField>
+
+## Methods
+
+### all()
+
+Retrieves all available payment methods for the configured account.
+
+```php
+public function all(): mixed
+```
+
+**Source**: `src/Services/PaymentMethodService.php:15`
+
+#### Parameters
+
+This method takes no parameters.
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  Array of payment method objects. Each payment method contains:
+  <Expandable title="Response structure">
+    <ResponseField name="id" type="string">
+      Payment method identifier (e.g., "visa", "master", "amex")
+    </ResponseField>
+
+    <ResponseField name="name" type="string">
+      Display name (e.g., "Visa", "Mastercard")
+    </ResponseField>
+
+    <ResponseField name="payment_type_id" type="string">
+      Payment type: `credit_card`, `debit_card`, `prepaid_card`, `ticket`,
+      `bank_transfer`, etc.
+    </ResponseField>
+
+    <ResponseField name="status" type="string">
+      Payment method status: `active` or `inactive`
+    </ResponseField>
+
+    <ResponseField name="secure_thumbnail" type="string">
+      URL to payment method logo image
+    </ResponseField>
+
+    <ResponseField name="thumbnail" type="string">
+      Alternative logo URL
+    </ResponseField>
+
+    <ResponseField name="deferred_capture" type="string">
+      Whether the method supports deferred capture: `supported`, `unsupported`,
+      or `does_not_apply`
+    </ResponseField>
+
+    <ResponseField name="settings" type="array">
+      Configuration settings: - `security_code` (object): CVV requirements -
+      `card_number` (object): Card number validation - `bin` (object): BIN
+      detection settings
+    </ResponseField>
+
+    <ResponseField name="additional_info_needed" type="array">
+      Additional fields required for this payment method
+    </ResponseField>
+
+    <ResponseField name="min_allowed_amount" type="numeric">
+      Minimum payment amount
+    </ResponseField>
+
+    <ResponseField name="max_allowed_amount" type="numeric">
+      Maximum payment amount
+    </ResponseField>
+
+    <ResponseField name="accreditation_time" type="integer">
+      Time in minutes until payment is credited
+    </ResponseField>
+
+    <ResponseField name="financial_institutions" type="array">
+      Available issuing banks/institutions
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Controller injection
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+use Illuminate\Http\JsonResponse;
+
+final class PaymentMethodController
+{
+public function index(
+PaymentMethodService $paymentMethodService
+): JsonResponse {
+$methods = $paymentMethodService->all();
+
+        // Format response
+        $formatted = collect($methods)->map(fn($method) => [
+            'id' => data_get($method, 'id'),
+            'name' => data_get($method, 'name'),
+            'type' => data_get($method, 'payment_type_id'),
+            'thumbnail' => data_get($method, 'secure_thumbnail'),
+        ]);
+
+        return response()->json($formatted);
+    }
+
+}
+
+````
+
+```php Service resolution
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+
+$service = app(PaymentMethodService::class);
+$methods = $service->all();
+
+foreach ($methods as $method) {
+    echo data_get($method, 'name') . "\n";
+}
+````
+
+```php Route closure
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/payment-methods', function (
+    PaymentMethodService $service
+) {
+    return response()->json($service->all());
+});
+```
+
+```php Filter by type
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+
+$methods = app(PaymentMethodService::class)->all();
+
+// Get only credit cards
+$creditCards = collect($methods)
+    ->filter(fn($m) => data_get($m, 'payment_type_id') === 'credit_card')
+    ->values();
+
+// Get only active methods
+$activeMethods = collect($methods)
+    ->filter(fn($m) => data_get($m, 'status') === 'active')
+    ->values();
+```
+
+</CodeGroup>
+
+## Common Payment Method IDs
+
+### Credit Cards
+
+| ID          | Name             |
+| ----------- | ---------------- |
+| `visa`      | Visa             |
+| `master`    | Mastercard       |
+| `amex`      | American Express |
+| `naranja`   | Naranja          |
+| `cabal`     | Cabal            |
+| `cencosud`  | Cencosud         |
+| `cordobesa` | Cordobesa        |
+
+### Debit Cards
+
+| ID          | Name                        |
+| ----------- | --------------------------- |
+| `debvisa`   | Visa Débito                 |
+| `debmaster` | Mastercard Débito (Maestro) |
+| `debcabal`  | Cabal Débito                |
+
+<Note>
+  Available payment methods vary by country and account configuration. Always
+  fetch methods dynamically rather than hardcoding IDs.
+</Note>
+
+## Common Patterns
+
+### Display payment options to users
+
+Build a payment method selector:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+
+public function getPaymentOptions()
+{
+    $methods = app(PaymentMethodService::class)->all();
+
+    $options = collect($methods)
+        ->filter(fn($m) => data_get($m, 'status') === 'active')
+        ->filter(fn($m) => data_get($m, 'payment_type_id') === 'credit_card')
+        ->map(fn($method) => [
+            'value' => data_get($method, 'id'),
+            'label' => data_get($method, 'name'),
+            'icon' => data_get($method, 'secure_thumbnail'),
+        ])
+        ->values();
+
+    return view('checkout.payment-methods', [
+        'paymentMethods' => $options,
+    ]);
+}
+```
+
+### Cache payment methods
+
+Reduce API calls by caching results:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+use Illuminate\Support\Facades\Cache;
+
+public function getCachedPaymentMethods()
+{
+    return Cache::remember('mercadopago.payment_methods', now()->addHours(24), function () {
+        return app(PaymentMethodService::class)->all();
+    });
+}
+```
+
+### Validate payment method ID
+
+Verify a payment method is available:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+
+public function validatePaymentMethod(string $methodId): bool
+{
+    $methods = app(PaymentMethodService::class)->all();
+
+    return collect($methods)->contains(function ($method) use ($methodId) {
+        return data_get($method, 'id') === $methodId
+            && data_get($method, 'status') === 'active';
+    });
+}
+```
+
+### Get installment options
+
+Extract installment information:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+
+public function getInstallmentOptions(string $methodId)
+{
+    $methods = app(PaymentMethodService::class)->all();
+
+    $method = collect($methods)
+        ->firstWhere('id', $methodId);
+
+    if (!$method) {
+        return [];
+    }
+
+    $issuers = data_get($method, 'financial_institutions', []);
+
+    return collect($issuers)->map(fn($issuer) => [
+        'id' => data_get($issuer, 'id'),
+        'name' => data_get($issuer, 'name'),
+    ])->values();
+}
+```
+
+### Build frontend configuration
+
+Generate configuration for MercadoPago.js:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
+
+public function getFrontendConfig()
+{
+    $methods = app(PaymentMethodService::class)->all();
+
+    return [
+        'public_key' => config('mercadopago.public_key'),
+        'payment_methods' => collect($methods)
+            ->filter(fn($m) => data_get($m, 'status') === 'active')
+            ->map(fn($m) => [
+                'id' => data_get($m, 'id'),
+                'name' => data_get($m, 'name'),
+                'type' => data_get($m, 'payment_type_id'),
+            ])
+            ->values(),
+    ];
+}
+```
+
+## Response Example
+
+Typical response for a single payment method:
+
+```json
+{
+  "id": "visa",
+  "name": "Visa",
+  "payment_type_id": "credit_card",
+  "status": "active",
+  "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/visa.gif",
+  "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/visa.gif",
+  "deferred_capture": "supported",
+  "settings": [
+    {
+      "security_code": {
+        "length": 3,
+        "card_location": "back",
+        "mode": "mandatory"
+      },
+      "card_number": {
+        "length": 16,
+        "validation": "standard"
+      },
+      "bin": {
+        "pattern": "^4",
+        "installments_pattern": "^4",
+        "exclusion_pattern": null
+      }
+    }
+  ],
+  "additional_info_needed": [
+    "cardholder_name",
+    "cardholder_identification_number"
+  ],
+  "min_allowed_amount": 0.5,
+  "max_allowed_amount": 250000,
+  "accreditation_time": 0,
+  "financial_institutions": []
+}
+```
+
+## Error Handling
+
+<ResponseField name="MercadoPagoConfigurationException" type="exception">
+  Thrown when: - MercadoPago SDK is not installed - Required SDK classes are not
+  found - SDK methods are unavailable
+</ResponseField>
+
+<ResponseField name="MercadoPagoException" type="exception">
+  Thrown by the MercadoPago SDK for API errors: - Invalid credentials - Network
+  errors - API unavailability
+</ResponseField>
+
+### Error handling example
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+
+try {
+    $methods = $paymentMethodService->all();
+
+    return response()->json($methods);
+} catch (MercadoPagoConfigurationException $e) {
+    \Log::error('MercadoPago configuration error', [
+        'message' => $e->getMessage(),
+    ]);
+    return response()->json(['error' => 'Service misconfigured'], 500);
+} catch (\Exception $e) {
+    \Log::error('Failed to fetch payment methods', [
+        'error' => $e->getMessage(),
+    ]);
+    return response()->json(['error' => 'Could not load payment methods'], 500);
+}
+```
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="PaymentService" icon="credit-card" href="/api/payment-service">
+    Process payments with payment methods
+  </Card>
+  <Card title="CardService" icon="credit-card-front" href="/api/card-service">
+    Save customer payment methods
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="Processing Payments Guide"
+    icon="book"
+    href="/guides/processing-payments"
+  >
+    Learn about payment processing
+  </Card>
+  <Card
+    title="MercadoPago API Documentation"
+    icon="link"
+    href="https://www.mercadopago.com/developers/en/reference/payment_methods/_payment_methods/get"
+  >
+    Official payment methods API reference
+  </Card>
+</CardGroup>

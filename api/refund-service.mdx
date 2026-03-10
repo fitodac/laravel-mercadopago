@@ -1,0 +1,398 @@
+---
+title: "RefundService"
+description: "API reference for processing payment refunds"
+icon: "rotate-left"
+---
+
+## Overview
+
+The `RefundService` class handles full and partial refunds of approved payments. Refunds return money to the customer and update the payment status accordingly.
+
+**Source**: `src/Services/RefundService.php:9`
+
+<Note>
+  Only payments with `approved` status can be refunded. Refund availability
+  depends on the payment method and time elapsed since approval.
+</Note>
+
+## Constructor
+
+```php
+public function __construct(
+    private MercadoPagoClientFactory $clientFactory,
+) {}
+```
+
+### Dependencies
+
+<ParamField path="clientFactory" type="MercadoPagoClientFactory" required>
+  Factory for creating and configuring MercadoPago SDK clients. Automatically
+  injected by Laravel's service container.
+</ParamField>
+
+## Methods
+
+### create()
+
+Creates a full or partial refund for an approved payment.
+
+```php
+public function create(string $paymentId, array $payload = []): mixed
+```
+
+**Source**: `src/Services/RefundService.php:15`
+
+#### Parameters
+
+<ParamField path="paymentId" type="string" required>
+  The MercadoPago payment ID to refund (must be an approved payment)
+</ParamField>
+
+<ParamField path="payload" type="array" default="[]">
+  Optional refund configuration.
+  <Expandable title="Payload structure">
+    <ParamField path="amount" type="numeric">
+      Partial refund amount. If omitted, a full refund is processed. - For
+      **partial refunds**: Include the `amount` to refund - For **full
+      refunds**: Omit the `amount` field or pass an empty array
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<Info>
+  **Implementation detail** (src/Services/RefundService.php:21-28): When
+  `amount` is present in the payload, the service calls `refund()` with the
+  specific amount. Otherwise, it calls `refundTotal()` for a complete refund.
+</Info>
+
+#### Returns
+
+<ResponseField name="response" type="mixed">
+  MercadoPago refund object containing:
+  <Expandable title="Response structure">
+    <ResponseField name="id" type="integer">
+      Unique refund identifier
+    </ResponseField>
+
+    <ResponseField name="payment_id" type="integer">
+      Associated payment ID
+    </ResponseField>
+
+    <ResponseField name="amount" type="numeric">
+      Refunded amount
+    </ResponseField>
+
+    <ResponseField name="status" type="string">
+      Refund status (typically "approved")
+    </ResponseField>
+
+    <ResponseField name="date_created" type="string">
+      ISO 8601 refund creation timestamp
+    </ResponseField>
+
+    <ResponseField name="source" type="object">
+      Refund source information
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Usage
+
+<CodeGroup>
+```php Full refund
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+
+$service = app(RefundService::class);
+
+// Full refund - omit amount or pass empty array
+$refund = $service->create('123456789');
+// or
+$refund = $service->create('123456789', []);
+
+$refundId = data_get($refund, 'id');
+$refundedAmount = data_get($refund, 'amount');
+
+````
+
+```php Partial refund
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+
+$service = app(RefundService::class);
+
+// Partial refund - specify amount
+$refund = $service->create('123456789', [
+    'amount' => 50.00, // Refund $50 of the total payment
+]);
+
+$refundId = data_get($refund, 'id');
+$refundedAmount = data_get($refund, 'amount');
+````
+
+```php Controller injection
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class RefundController
+{
+    public function store(
+        string $paymentId,
+        Request $request,
+        RefundService $refundService
+    ): JsonResponse {
+        $payload = $request->validate([
+            'amount' => ['sometimes', 'numeric', 'min:0.01'],
+        ]);
+
+        $refund = $refundService->create($paymentId, $payload);
+
+        return response()->json([
+            'refund_id' => data_get($refund, 'id'),
+            'amount' => data_get($refund, 'amount'),
+            'status' => data_get($refund, 'status'),
+        ], 201);
+    }
+}
+```
+
+```php With order update
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+use App\Models\Order;
+
+$order = Order::findOrFail($orderId);
+$paymentId = $order->mercadopago_payment_id;
+
+// Full refund
+$refund = app(RefundService::class)->create($paymentId);
+
+if (data_get($refund, 'status') === 'approved') {
+    $order->update([
+        'status' => 'refunded',
+        'refund_id' => data_get($refund, 'id'),
+        'refunded_at' => now(),
+    ]);
+}
+```
+
+</CodeGroup>
+
+## Full vs Partial Refunds
+
+### Full Refund
+
+Refunds the entire payment amount:
+
+```php
+// Original payment: $100.00
+$refund = $refundService->create($paymentId);
+// Refunds: $100.00
+```
+
+After a full refund:
+
+- Payment status changes to `refunded`
+- Customer receives the complete payment amount
+- No additional refunds can be processed
+
+### Partial Refund
+
+Refunds a portion of the payment:
+
+```php
+// Original payment: $100.00
+$refund = $refundService->create($paymentId, ['amount' => 30.00]);
+// Refunds: $30.00, Remaining: $70.00
+```
+
+Partial refund rules:
+
+- You can process multiple partial refunds
+- Total refunds cannot exceed original payment amount
+- Payment status may change depending on total refunded
+
+## Common Patterns
+
+### Refund with validation
+
+Validate payment status before refunding:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+
+$paymentService = app(PaymentService::class);
+$refundService = app(RefundService::class);
+
+// Check payment status
+$payment = $paymentService->get($paymentId);
+
+if (data_get($payment, 'status') !== 'approved') {
+    throw new \Exception('Only approved payments can be refunded');
+}
+
+// Process refund
+$refund = $refundService->create($paymentId);
+```
+
+### Refund with reason tracking
+
+Store refund details in your database:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+use App\Models\Refund;
+
+$refund = app(RefundService::class)->create($paymentId, [
+    'amount' => 50.00,
+]);
+
+Refund::create([
+    'order_id' => $orderId,
+    'mercadopago_payment_id' => $paymentId,
+    'mercadopago_refund_id' => data_get($refund, 'id'),
+    'amount' => data_get($refund, 'amount'),
+    'reason' => request()->input('reason'),
+    'processed_by' => auth()->id(),
+    'processed_at' => now(),
+]);
+```
+
+### Automatic refund on order cancellation
+
+```php
+use Fitodac\LaravelMercadoPago\Services\RefundService;
+
+public function cancelOrder(Order $order)
+{
+    if ($order->status === 'paid' && $order->mercadopago_payment_id) {
+        try {
+            $refund = app(RefundService::class)
+                ->create($order->mercadopago_payment_id);
+
+            $order->update([
+                'status' => 'refunded',
+                'refund_id' => data_get($refund, 'id'),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Refund failed during order cancellation', [
+                'order_id' => $order->id,
+                'payment_id' => $order->mercadopago_payment_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \Exception('Could not process refund');
+        }
+    }
+
+    $order->update(['status' => 'cancelled']);
+}
+```
+
+### Calculate refundable amount
+
+Check how much can still be refunded:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+$payment = app(PaymentService::class)->get($paymentId);
+
+$totalAmount = data_get($payment, 'transaction_amount');
+$refundedAmount = data_get($payment, 'transaction_amount_refunded', 0);
+$refundableAmount = $totalAmount - $refundedAmount;
+
+if ($refundableAmount > 0) {
+    // Can still refund up to $refundableAmount
+}
+```
+
+## Error Handling
+
+<ResponseField name="MercadoPagoConfigurationException" type="exception">
+  Thrown when: - MercadoPago SDK is not installed - Required SDK classes are not
+  found - SDK methods are unavailable
+</ResponseField>
+
+<ResponseField name="MercadoPagoException" type="exception">
+  Thrown by the MercadoPago SDK for API errors: - Invalid credentials - Payment
+  not found - Payment not refundable (wrong status) - Refund amount exceeds
+  available amount - Refund window expired - Network errors
+</ResponseField>
+
+### Error handling example
+
+```php
+use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
+
+try {
+    $refund = $refundService->create($paymentId, $payload);
+
+    return response()->json([
+        'success' => true,
+        'refund_id' => data_get($refund, 'id'),
+    ]);
+} catch (MercadoPagoConfigurationException $e) {
+    return response()->json(['error' => 'Service misconfigured'], 500);
+} catch (\Exception $e) {
+    $message = $e->getMessage();
+
+    if (str_contains($message, 'not found')) {
+        return response()->json(['error' => 'Payment not found'], 404);
+    }
+
+    if (str_contains($message, 'status')) {
+        return response()->json(['error' => 'Payment cannot be refunded'], 422);
+    }
+
+    \Log::error('Refund failed', [
+        'payment_id' => $paymentId,
+        'error' => $message,
+    ]);
+
+    return response()->json(['error' => 'Refund processing failed'], 500);
+}
+```
+
+## Refund Limitations
+
+<Warning>
+  Refund availability depends on several factors: - **Payment method**: Some
+  methods have limited refund windows - **Time elapsed**: Refunds may not be
+  available after a certain period - **Payment status**: Only `approved`
+  payments can be refunded - **Amount**: Partial refunds cannot exceed remaining
+  balance
+</Warning>
+
+### Typical refund windows
+
+- **Credit cards**: Up to 180 days
+- **Debit cards**: Up to 90 days
+- **Cash payments**: Varies by provider
+
+Check MercadoPago documentation for specific refund policies by payment method.
+
+## Related Services
+
+<CardGroup cols={2}>
+  <Card title="PaymentService" icon="credit-card" href="/api/payment-service">
+    Create and retrieve payments
+  </Card>
+  <Card title="WebhookService" icon="webhook" href="/api/webhook-service">
+    Handle refund notifications
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="Refunds Guide" icon="book" href="/guides/refunds">
+    Complete guide to processing refunds
+  </Card>
+  <Card
+    title="MercadoPago API Documentation"
+    icon="link"
+    href="https://www.mercadopago.com/developers/en/reference/chargebacks/_payments_id_refunds/post"
+  >
+    Official refunds API reference
+  </Card>
+</CardGroup>
