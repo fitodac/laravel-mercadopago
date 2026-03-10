@@ -7,71 +7,134 @@
     "light": "#47C6FF",
     "dark": "#0077AA"
   },
-  "topbarLinks": [
-    {
-      "name": "fitodac/laravel-mercadopago",
-      "url": "https://github.com/fitodac/laravel-mercadopago"
+  "favicon": "/favicon.svg",
+
+  
+
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "introduction",
+              "installation",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Core concepts",
+            "pages": [
+              "core-concepts/architecture",
+              "core-concepts/services",
+              "core-concepts/credentials"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/quickstart",
+              "guides/create-preferences",
+              "guides/processing-payments",
+              "guides/handling-webhooks",
+              "guides/managing-customers",
+              "guides/refunds",
+              "guides/testing"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/production",
+              "deployment/security"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/debugging"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": [
+              
+            ]
+          },
+          {
+            "group": "Demo Endpoints",
+            "pages": [
+              
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Documentation",
+          "href": "https://mintlify.com/docs",
+          "icon": "book-open-cover"
+        },
+        {
+          "anchor": "Blog",
+          "href": "https://mintlify.com/blog",
+          "icon": "newspaper"
+        }
+      ]
     }
-  ],
-  "topbarCtaButton": {
-    "name": "fitodac/laravel-mercadopago",
-    "url": "https://github.com/fitodac/laravel-mercadopago"
   },
-  "tabs": [
-    {
-      "name": "Documentation",
-      "url": "/"
-    },
-    {
-      "name": "API Reference",
-      "url": "/preference-service"
+
+  
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:hi@mintlify.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://dashboard.mintlify.com"
     }
-  ],
-  "navigation": [
-    {
-      "group": "Get Started",
-      "pages": [
-        "introduction",
-        "installation",
-        "configuration"
-      ]
-    },
-    {
-      "group": "Core Concepts",
-      "pages": [
-        "architecture",
-        "services",
-        "credentials"
-      ]
-    },
-    {
-      "group": "Guides",
-      "pages": [
-        "quickstart",
-        "creating-preferences",
-        "processing-payments",
-        "handling-webhooks",
-        "managing-customers",
-        "refunds",
-        "testing"
-      ]
-    },
-    {
-      "group": "Deployment",
-      "pages": [
-        "production",
-        "security"
-      ]
-    },
-    {
-      "group": "Troubleshooting",
-      "pages": [
-        "common-issues",
-        "debugging"
-      ]
+  },
+  "contextual": {
+    "options": [
+     "copy",
+     "view",
+     "chatgpt",
+     "claude",
+     "perplexity",
+     "mcp",
+     "cursor",
+     "vscode"
+   ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/mintlify",
+      "github": "https://github.com/mintlify",
+      "linkedin": "https://linkedin.com/company/mintlify"
     }
-  ],
-  "footerSocials": {
-    "github": "https://github.com/fitodac/laravel-mercadopago"
   }
 }
