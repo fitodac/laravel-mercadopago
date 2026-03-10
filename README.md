@@ -56,15 +56,15 @@ my-app/
 
 ```json
 {
-    "repositories": [
-        {
-            "type": "path",
-            "url": "plugins/laravel-mercadopago",
-            "options": {
-                "symlink": true
-            }
-        }
-    ]
+  "repositories": [
+    {
+      "type": "path",
+      "url": "plugins/laravel-mercadopago",
+      "options": {
+        "symlink": true
+      }
+    }
+  ]
 }
 ```
 
@@ -118,14 +118,14 @@ MERCADOPAGO_RUNTIME_ENVIRONMENT=
 
 ### Qué hace cada variable
 
-| Variable | Requerida | Descripción |
-| --- | --- | --- |
-| `MERCADOPAGO_ACCESS_TOKEN` | Sí | Token usado por el SDK para llamar a Mercado Pago |
-| `MERCADOPAGO_PUBLIC_KEY` | No | Clave pública útil para integraciones frontend |
-| `MERCADOPAGO_WEBHOOK_SECRET` | No, pero recomendada en producción | Permite validar la firma del webhook |
-| `MERCADOPAGO_ROUTE_PREFIX` | No | Prefijo de rutas. Por defecto `api/mercadopago` |
-| `MERCADOPAGO_ENABLE_DEMO_ROUTES` | No | Habilita endpoints demo en `local` y `testing` |
-| `MERCADOPAGO_RUNTIME_ENVIRONMENT` | No | Fuerza el runtime del SDK. Si no se define, el paquete usa `local` en `local/testing` y `server` en el resto |
+| Variable                          | Requerida                          | Descripción                                                                                                  |
+| --------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `MERCADOPAGO_ACCESS_TOKEN`        | Sí                                 | Token usado por el SDK para llamar a Mercado Pago                                                            |
+| `MERCADOPAGO_PUBLIC_KEY`          | No                                 | Clave pública útil para integraciones frontend                                                               |
+| `MERCADOPAGO_WEBHOOK_SECRET`      | No, pero recomendada en producción | Permite validar la firma del webhook                                                                         |
+| `MERCADOPAGO_ROUTE_PREFIX`        | No                                 | Prefijo de rutas. Por defecto `api/mercadopago`                                                              |
+| `MERCADOPAGO_ENABLE_DEMO_ROUTES`  | No                                 | Habilita endpoints demo en `local` y `testing`                                                               |
+| `MERCADOPAGO_RUNTIME_ENVIRONMENT` | No                                 | Fuerza el runtime del SDK. Si no se define, el paquete usa `local` en `local/testing` y `server` en el resto |
 
 ### Recomendaciones de seguridad
 
@@ -140,8 +140,8 @@ Todas las rutas usan el prefijo configurado en `MERCADOPAGO_ROUTE_PREFIX`.
 
 ### Ruta siempre activa
 
-| Método | Ruta | Uso |
-| --- | --- | --- |
+| Método | Ruta                        | Uso                                                      |
+| ------ | --------------------------- | -------------------------------------------------------- |
 | `POST` | `/api/mercadopago/webhooks` | Recepción y validación de notificaciones de Mercado Pago |
 
 ### Rutas demo
@@ -153,19 +153,19 @@ Estas rutas solo responden cuando:
 
 En cualquier otro caso responden `404`.
 
-| Método | Ruta | Servicio asociado |
-| --- | --- | --- |
-| `GET` | `/api/mercadopago/health` | Verifica si el paquete tiene credenciales mínimas |
-| `GET` | `/api/mercadopago/payment-methods` | `PaymentMethodService` |
-| `POST` | `/api/mercadopago/preferences` | `PreferenceService` |
-| `POST` | `/api/mercadopago/payments` | `PaymentService` |
-| `GET` | `/api/mercadopago/payments/{paymentId}` | `PaymentService` |
-| `POST` | `/api/mercadopago/payments/{paymentId}/refunds` | `RefundService` |
-| `POST` | `/api/mercadopago/customers` | `CustomerService` |
-| `GET` | `/api/mercadopago/customers/{customerId}` | `CustomerService` |
-| `POST` | `/api/mercadopago/customers/{customerId}/cards` | `CardService` |
-| `DELETE` | `/api/mercadopago/customers/{customerId}/cards/{cardId}` | `CardService` |
-| `POST` | `/api/mercadopago/test-users` | `TestUserService` |
+| Método   | Ruta                                                     | Servicio asociado                                 |
+| -------- | -------------------------------------------------------- | ------------------------------------------------- |
+| `GET`    | `/api/mercadopago/health`                                | Verifica si el paquete tiene credenciales mínimas |
+| `GET`    | `/api/mercadopago/payment-methods`                       | `PaymentMethodService`                            |
+| `POST`   | `/api/mercadopago/preferences`                           | `PreferenceService`                               |
+| `POST`   | `/api/mercadopago/payments`                              | `PaymentService`                                  |
+| `GET`    | `/api/mercadopago/payments/{paymentId}`                  | `PaymentService`                                  |
+| `POST`   | `/api/mercadopago/payments/{paymentId}/refunds`          | `RefundService`                                   |
+| `POST`   | `/api/mercadopago/customers`                             | `CustomerService`                                 |
+| `GET`    | `/api/mercadopago/customers/{customerId}`                | `CustomerService`                                 |
+| `POST`   | `/api/mercadopago/customers/{customerId}/cards`          | `CardService`                                     |
+| `DELETE` | `/api/mercadopago/customers/{customerId}/cards/{cardId}` | `CardService`                                     |
+| `POST`   | `/api/mercadopago/test-users`                            | `TestUserService`                                 |
 
 ## Implementación recomendada en tu proyecto
 
@@ -268,23 +268,23 @@ Los endpoints del paquete validan estos campos mínimos.
 
 ```json
 {
-    "items": [
-        {
-            "title": "Producto demo",
-            "quantity": 1,
-            "unit_price": 100.5
-        }
-    ],
-    "payer": {
-        "email": "buyer@example.com"
-    },
-    "back_urls": {
-        "success": "https://tu-app.test/pagos/exito",
-        "pending": "https://tu-app.test/pagos/pendiente",
-        "failure": "https://tu-app.test/pagos/error"
-    },
-    "notification_url": "https://tu-app.test/api/mercadopago/webhooks",
-    "external_reference": "pedido-1001"
+  "items": [
+    {
+      "title": "Producto demo",
+      "quantity": 1,
+      "unit_price": 100.5
+    }
+  ],
+  "payer": {
+    "email": "buyer@example.com"
+  },
+  "back_urls": {
+    "success": "https://tu-app.test/pagos/exito",
+    "pending": "https://tu-app.test/pagos/pendiente",
+    "failure": "https://tu-app.test/pagos/error"
+  },
+  "notification_url": "https://tu-app.test/api/mercadopago/webhooks",
+  "external_reference": "pedido-1001"
 }
 ```
 
@@ -292,16 +292,16 @@ Los endpoints del paquete validan estos campos mínimos.
 
 ```json
 {
-    "transaction_amount": 100.5,
-    "token": "CARD_TOKEN",
-    "description": "Pago pedido 1001",
-    "installments": 1,
-    "payment_method_id": "visa",
-    "payer": {
-        "email": "buyer@example.com"
-    },
-    "external_reference": "pedido-1001",
-    "notification_url": "https://tu-app.test/api/mercadopago/webhooks"
+  "transaction_amount": 100.5,
+  "token": "CARD_TOKEN",
+  "description": "Pago pedido 1001",
+  "installments": 1,
+  "payment_method_id": "visa",
+  "payer": {
+    "email": "buyer@example.com"
+  },
+  "external_reference": "pedido-1001",
+  "notification_url": "https://tu-app.test/api/mercadopago/webhooks"
 }
 ```
 
@@ -309,9 +309,9 @@ Los endpoints del paquete validan estos campos mínimos.
 
 ```json
 {
-    "email": "buyer@example.com",
-    "first_name": "Ada",
-    "last_name": "Lovelace"
+  "email": "buyer@example.com",
+  "first_name": "Ada",
+  "last_name": "Lovelace"
 }
 ```
 
@@ -319,7 +319,7 @@ Los endpoints del paquete validan estos campos mínimos.
 
 ```json
 {
-    "token": "CARD_TOKEN"
+  "token": "CARD_TOKEN"
 }
 ```
 
@@ -335,7 +335,7 @@ Reembolso parcial:
 
 ```json
 {
-    "amount": 50
+  "amount": 50
 }
 ```
 
@@ -343,8 +343,8 @@ Reembolso parcial:
 
 ```json
 {
-    "site_id": "MLA",
-    "description": "Usuario de prueba para QA"
+  "site_id": "MLA",
+  "description": "Usuario de prueba para QA"
 }
 ```
 
@@ -392,14 +392,14 @@ Respuesta esperada:
 
 ```json
 {
-    "ok": true,
-    "data": {
-        "configured": true,
-        "has_public_key": true,
-        "has_webhook_secret": true,
-        "environment": "local"
-    },
-    "meta": []
+  "ok": true,
+  "data": {
+    "configured": true,
+    "has_public_key": true,
+    "has_webhook_secret": true,
+    "environment": "local"
+  },
+  "meta": []
 }
 ```
 
@@ -594,9 +594,9 @@ Las rutas del paquete responden JSON.
 
 ```json
 {
-    "ok": true,
-    "data": {},
-    "meta": []
+  "ok": true,
+  "data": {},
+  "meta": []
 }
 ```
 
@@ -604,8 +604,8 @@ Las rutas del paquete responden JSON.
 
 ```json
 {
-    "ok": false,
-    "message": "Mensaje del error"
+  "ok": false,
+  "message": "Mensaje del error"
 }
 ```
 
