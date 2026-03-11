@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Fitodac\LaravelMercadoPago\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-final class CreateTestUserRequest extends FormRequest
+final class CreateTestUserRequest extends MercadoPagoFormRequest
 {
     public function authorize(): bool
     {

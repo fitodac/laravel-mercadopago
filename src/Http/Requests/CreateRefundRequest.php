@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Fitodac\LaravelMercadoPago\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
-
-final class CreateRefundRequest extends FormRequest
+final class CreateRefundRequest extends MercadoPagoFormRequest
 {
     public function authorize(): bool
     {

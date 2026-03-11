@@ -49,9 +49,13 @@ final class LaravelMercadoPagoServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../config/mercadopago.php' => config_path('mercadopago.php'),
         ], 'mercadopago-config');
+        $this->publishes([
+            __DIR__ . '/../lang' => $this->app->langPath('vendor/mercadopago'),
+        ], 'mercadopago-lang');
 
         $router->aliasMiddleware('mercadopago.demo', EnsureDemoRoutesEnabled::class);
 
+        $this->loadTranslationsFrom(__DIR__ . '/../lang', 'mercadopago');
         $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
     }
 }

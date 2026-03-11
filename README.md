@@ -105,6 +105,30 @@ Opcionalmente podés publicar el archivo de configuración:
 php artisan vendor:publish --tag=mercadopago-config
 ```
 
+El paquete también incluye traducciones propias en inglés, español y portugués. Si querés publicarlas para overridearlas desde tu app:
+
+```bash
+php artisan vendor:publish --tag=mercadopago-lang
+```
+
+Eso publica los archivos bajo:
+
+```text
+lang/vendor/mercadopago/
+```
+
+Los strings traducidos del paquete cubren:
+
+- mensajes de excepción propios
+- errores de validación de los endpoints demo
+- atributos legibles usados en respuestas `422`
+
+Laravel resolverá automáticamente esas traducciones usando el locale actual de la aplicación, por ejemplo:
+
+```php
+app()->setLocale('pt');
+```
+
 Variables disponibles:
 
 ```ini

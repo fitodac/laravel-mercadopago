@@ -42,6 +42,17 @@ final class DemoRoutesTest extends TestCase
         $this->getJson('/api/mercadopago/health')->assertNotFound();
     }
 
+    public function test_health_endpoint_returns_translated_configuration_error(): void
+    {
+        config()->set('mercadopago.access_token', '');
+        config()->set('mercadopago.enable_demo_routes', true);
+        app()->setLocale('es');
+
+        $this->getJson('/api/mercadopago/health')
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'El access token de Mercado Pago no está configurado.');
+    }
+
     public function test_payment_methods_endpoint_delegates_to_the_service(): void
     {
         config()->set('mercadopago.enable_demo_routes', true);
@@ -82,6 +93,17 @@ final class DemoRoutesTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('data.id', 'pref_123');
+    }
+
+    public function test_preference_endpoint_returns_translated_validation_errors(): void
+    {
+        config()->set('mercadopago.enable_demo_routes', true);
+        app()->setLocale('pt');
+
+        $this->postJson('/api/mercadopago/preferences', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['items'])
+            ->assertJsonPath('errors.items.0', 'O campo itens é obrigatório.');
     }
 
     public function test_package_routes_are_registered(): void
