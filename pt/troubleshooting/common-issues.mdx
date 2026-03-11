@@ -1,0 +1,95 @@
+---
+title: Problemas comuns
+description: Resolva os problemas mais frequentes de setup e execução no Laravel MercadoPago.
+---
+
+## `Mercado Pago access token is not configured.`
+
+Causa:
+
+- `MERCADOPAGO_ACCESS_TOKEN` está ausente ou vazio
+
+Solução:
+
+```ini
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-your-access-token
+```
+
+Depois limpe o cache de config:
+
+```bash
+php artisan config:clear
+```
+
+## Os demo endpoints retornam `404`
+
+Causa:
+
+- `MERCADOPAGO_ENABLE_DEMO_ROUTES` não está em `true`
+- ou o ambiente da app não é `local` nem `testing`
+
+Solução:
+
+```ini
+APP_ENV=local
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+```
+
+## O webhook retorna `401`
+
+Causa:
+
+- `MERCADOPAGO_WEBHOOK_SECRET` não corresponde
+- o header `x-signature` está malformado
+- `x-request-id` ou `data.id` está ausente na request assinada
+
+Solução:
+
+- verifique o secret no Mercado Pago
+- confirme o formato `ts=...,v1=...`
+- confirme que o payload ou query string inclui o resource id
+
+## `Mercado Pago PHP SDK is not installed.`
+
+Causa:
+
+- a instalação do pacote está incompleta
+- as dependências não foram instaladas corretamente na app host
+
+Solução:
+
+```bash
+composer install
+composer show mercadopago/dx-php
+```
+
+## As rotas usam o prefixo errado
+
+Causa:
+
+- `MERCADOPAGO_ROUTE_PREFIX` mudou, mas o cache de config ainda guarda um valor antigo
+
+Solução:
+
+```bash
+php artisan config:clear
+php artisan route:list --name=mercadopago
+```
+
+## O health endpoint mostra `configured: false`
+
+Causa:
+
+- a resolução de credenciais falhou
+
+Solução:
+
+- verifique `MERCADOPAGO_ACCESS_TOKEN`
+- verifique o `credential_resolver` custom
+- confirme que o resolver retorna um `accessToken` não vazio
+
+## Páginas relacionadas
+
+- [Debugging](/pt/troubleshooting/debugging)
+- [Configuração](/pt/configuration)
+- [Segurança](/pt/deployment/security)

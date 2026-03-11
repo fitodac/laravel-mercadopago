@@ -1,0 +1,91 @@
+---
+title: Quickstart
+description: Instale o pacote, configure credenciais e crie sua primeira preference do Mercado Pago em um projeto Laravel.
+icon: rocket
+---
+
+## Pré-requisitos
+
+- Laravel `^12.0`
+- PHP `^8.2`
+- credenciais do Mercado Pago
+- uma app local rodando em `http://localhost:8000`
+
+## 1. Instale o pacote
+
+```bash
+composer require fitodac/laravel-mercadopago:^1.0
+```
+
+## 2. Configure o `.env`
+
+```ini
+APP_ENV=local
+MERCADOPAGO_ACCESS_TOKEN=TEST-your-access-token
+MERCADOPAGO_PUBLIC_KEY=TEST-your-public-key
+MERCADOPAGO_WEBHOOK_SECRET=test-secret
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+```
+
+## 3. Verifique as rotas
+
+```bash
+php artisan route:list --name=mercadopago
+```
+
+## 4. Verifique a saúde do pacote
+
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
+
+## 5. Crie uma preference
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/preferences \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "items": [
+      {
+        "title": "Starter product",
+        "quantity": 1,
+        "unit_price": 100.50
+      }
+    ],
+    "payer": {
+      "email": "buyer@example.com"
+    },
+    "back_urls": {
+      "success": "https://your-app.test/payments/success",
+      "pending": "https://your-app.test/payments/pending",
+      "failure": "https://your-app.test/payments/failure"
+    },
+    "notification_url": "https://your-app.test/api/mercadopago/webhooks",
+    "external_reference": "order-1001"
+  }'
+```
+
+Formato esperado da resposta:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "1234567890",
+    "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=...",
+    "sandbox_init_point": "https://sandbox.mercadopago.com/checkout/v1/redirect?pref_id=..."
+  },
+  "meta": []
+}
+```
+
+## 6. Saia do demo e vá para código de produção
+
+Quando o pacote estiver ligado corretamente, injete `PreferenceService` no seu próprio controller e pare de depender do endpoint demo para fluxos visíveis ao usuário.
+
+## Próximos passos
+
+- [Criar preferences](/pt/guides/creating-preferences)
+- [Lidar com webhooks](/pt/guides/handling-webhooks)
+- [Testing](/pt/guides/testing)

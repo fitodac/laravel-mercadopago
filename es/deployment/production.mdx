@@ -1,111 +1,76 @@
 ---
-title: Despliegue en Producción
-description: Desplegá Laravel MercadoPago a producción bajo las recomendaciones de alta disponibilidad y buenas prácticas.
+title: Despliegue en producción
+description: Prepará Laravel MercadoPago para producción con las variables correctas, webhook configurado y verificaciones finales.
 ---
 
-Esta guía condensa la puesta en escena para subir el paquete de manera sólida a los servidores de producción; contemplando procesos como el caché, optimizaciones y consideraciones de los distintos entornos.
+## Objetivos de producción
 
-## Pre-requisitos indispensables
+En producción, la configuración del paquete debería:
 
-Previo al pase a producción, tu arquitectura requiere:
+- usar credenciales reales de Mercado Pago
+- mantener las demo routes fuera de servicio
+- aceptar webhooks por HTTPS
+- validar firmas de webhook
 
-- PHP `^8.2` y dependencias subyacentes sanas
-- Laravel `^12.0` operando íntegramente
-- Credenciales en modo Producción de Mercado Pago verdaderas y autorizadas. (Token, clave pública, clave del webhook)
-- HTTPS activo (Mercado Pago prohíbe las peticiones regulares para webhooks e inicialización sin conexiones de capa seguras tipo Let's Encrypt o SSL comercial)
+## `.env` recomendado
 
-## Variables de Entorno y DotEnv
-
-<Steps>
-  <Step title="Configurando tu ambiente duro de producción">
-    Modificá el siguiente set de directrices en tu `.env` de servidor destino:
-
-    ```ini
-    APP_ENV=production
-    MERCADOPAGO_ACCESS_TOKEN=tu_access_token_real_generado_en_mp
-    MERCADOPAGO_PUBLIC_KEY=tu_public_key_real
-    MERCADOPAGO_WEBHOOK_SECRET=tu_secreto_para_firma_de_webhook
-    MERCADOPAGO_ENABLE_DEMO_ROUTES=false
-    MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
-    ```
-
-    <Warning>
-      Acordate bajo todo caso que este archivo NUNCA se debe acoplar o hacer push al control de códigos como Git.
-    </Warning>
-  </Step>
-
-  <Step title="Instalación de Dependencias">
-    Aprovecha y obligá al paquete a desechar variables de análisis o debugging con:
-
-    ```bash
-    composer install --no-dev --optimize-autoloader
-    ```
-  </Step>
-</Steps>
-
-## Clausura de Rutas "Demo"
-
-Existen seis (6) rutas catalogadas como de pre-producción/demo habilitadas que funcionan de manera fantástica al momento de desarrollo ya que facilitan simulaciones crudas. Sin embargo resultan invasivas bajo el entorno de explotación.
-
-El flag de tu `.env`: 
-`MERCADOPAGO_ENABLE_DEMO_ROUTES=false` imposibilitará sus usos de acá en adelante dando siempre a priori un código 404 mediante un Middleware incorporado.
-
-<Note>
-    Punto a tener presente: Esta regla excluye naturalmente a la ruta del `POST /api/mercadopago/webhooks`, la cual permanecerá activa y a la expectativa a toda hora.
-</Note>
-
-## Optimizaciones y Cachés de Framework
-
-Acostumbrá a Laravel a tomar ventajas del modo caching:
-
-<Steps>
-  <Step title="Limpiar remanentes de cachés locales en el servidor">
-    ```bash
-    php artisan config:clear
-    php artisan cache:clear
-    php artisan route:clear
-    ```
-  </Step>
-
-  <Step title="Compilar la ruta al máximo rendimiento">
-    ```bash
-    php artisan config:cache
-    php artisan route:cache
-    ```
-  </Step>
-
-  <Step title="Autoverificar y pingear las rutas seguras">
-    Larga una petición de tipo Test simulado contra tu IP para avalar este estado de producción:
-
-    ```bash
-    curl --request POST \
-      --url https://tu_url-en.com/api/mercadopago/webhooks \
-      --header 'Content-Type: application/json' \
-      --data '{"type":"payment","data":{"id":"123"}}'
-    ```
-
-    <Warning>
-      La respuesta debe fallar debido a un factor de `validated`: false. Es genial que lo haga, así es como detectamos que Mercado Pago es lo suficientemente estricto al solicitar firmas formadas de `x-signature` válidas desde afuera.
-    </Warning>
-
-  </Step>
-</Steps>
-
-## Troubleshooting Típico (En Entorno Producción)
-
-### Rutas a 404 Genéricos Globales
-
-Si observas un 404 sobre el Webhook intentá recargar tu cacheado. 
-```bash
-composer dump-autoload
-php artisan package:discover
-php artisan route:cache
+```ini
+APP_ENV=production
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-your-production-access-token
+MERCADOPAGO_PUBLIC_KEY=APP_USR-your-production-public-key
+MERCADOPAGO_WEBHOOK_SECRET=your-production-webhook-secret
+MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+MERCADOPAGO_RUNTIME_ENVIRONMENT=server
 ```
 
-## Próximos pasos recomendables
+## Verificaciones obligatorias
 
-<CardGroup cols={2}>
-  <Card title="Checklist de Seguridad Total" icon="shield" href="/es/deployment/security">
-    Profundizá aún más qué cosas se pueden mejorar.
-  </Card>
-</CardGroup>
+1. Confirmá que la webhook URL apunte a tu dominio real con HTTPS.
+2. Confirmá que `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`.
+3. Confirmá que `MERCADOPAGO_WEBHOOK_SECRET` coincida con el valor en Mercado Pago.
+4. Limpiá y regenerá la caché de config después de cambiar secretos.
+
+## Expectativa sobre rutas
+
+Ejecutá:
+
+```bash
+php artisan route:list --name=mercadopago
+```
+
+La lista sigue mostrando demo routes, pero las requests a esas rutas deberían devolver `404` en producción por `EnsureDemoRoutesEnabled`.
+
+La ruta de webhook debe seguir activa:
+
+```text
+POST /api/mercadopago/webhooks
+```
+
+## Checklist de despliegue
+
+- [ ] `MERCADOPAGO_ACCESS_TOKEN` está definido
+- [ ] `MERCADOPAGO_PUBLIC_KEY` está definido si usás tokenización frontend
+- [ ] `MERCADOPAGO_WEBHOOK_SECRET` está definido
+- [ ] `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`
+- [ ] HTTPS está habilitado
+- [ ] la caché de config fue refrescada
+- [ ] la webhook URL está configurada en Mercado Pago
+
+## Smoke tests
+
+Después del deploy:
+
+```bash
+php artisan config:clear
+php artisan route:list --name=mercadopago
+curl -X POST https://your-domain.com/api/mercadopago/webhooks -H 'Content-Type: application/json' -d '{}'
+```
+
+Esperá que el endpoint de webhook responda, incluso si el payload no sirve todavía para el negocio.
+
+## Páginas relacionadas
+
+- [Seguridad](/es/deployment/security)
+- [Endpoint de webhook](/es/api/endpoints/webhooks)
+- [Problemas comunes](/es/troubleshooting/common-issues)

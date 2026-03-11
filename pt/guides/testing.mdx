@@ -1,0 +1,61 @@
+---
+title: Testing
+description: Teste o Laravel MercadoPago localmente com demo endpoints, health checks e test users.
+---
+
+## Habilitar demo routes
+
+Use:
+
+```ini
+APP_ENV=local
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+```
+
+## Demo endpoints disponíveis para testes
+
+| Método | Rota |
+| --- | --- |
+| `GET` | `/api/mercadopago/health` |
+| `GET` | `/api/mercadopago/payment-methods` |
+| `POST` | `/api/mercadopago/preferences` |
+| `POST` | `/api/mercadopago/payments` |
+| `GET` | `/api/mercadopago/payments/{paymentId}` |
+| `POST` | `/api/mercadopago/payments/{paymentId}/refunds` |
+| `POST` | `/api/mercadopago/customers` |
+| `GET` | `/api/mercadopago/customers/{customerId}` |
+| `POST` | `/api/mercadopago/customers/{customerId}/cards` |
+| `DELETE` | `/api/mercadopago/customers/{customerId}/cards/{cardId}` |
+| `POST` | `/api/mercadopago/test-users` |
+
+## Criar um test user
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/test-users \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "site_id": "MLA",
+    "description": "Local QA user"
+  }'
+```
+
+## Sequência prática de teste
+
+1. chamar `/health`
+2. listar payment methods
+3. criar uma preference
+4. criar ou consultar um customer
+5. testar a recepção de webhooks
+
+## Notas
+
+- os demo endpoints são apenas para `local` e `testing`
+- a rota de webhook pode ser testada em qualquer ambiente
+- testar direct card payments ainda exige fluxos válidos de tokenização no frontend
+
+## Páginas relacionadas
+
+- [Quickstart](/pt/guides/quickstart)
+- [TestUserService](/pt/api/test-user-service)
+- [Endpoint de test users](/pt/api/endpoints/test-users)

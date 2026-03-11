@@ -1,0 +1,35 @@
+---
+title: Endpoint de payments
+description: Referência de endpoints demo para criar, consultar e reembolsar payments.
+---
+
+## Disponibilidade
+
+Estes endpoints só respondem quando as demo routes estão habilitadas e o ambiente da app é `local` ou `testing`.
+
+## Rotas
+
+```text
+POST /api/mercadopago/payments
+GET /api/mercadopago/payments/{paymentId}
+POST /api/mercadopago/payments/{paymentId}/refunds
+```
+
+## Campos obrigatórios para create payment
+
+- `transaction_amount`
+- `token`
+- `description`
+- `installments`
+- `payment_method_id`
+- `payer.email`
+
+## Payload de refund
+
+`amount` é opcional. Se for omitido, o pacote solicita um full refund.
+
+## Páginas relacionadas
+
+- [PaymentService](/pt/api/payment-service)
+- [RefundService](/pt/api/refund-service)
+- [Processar payments](/pt/guides/processing-payments)

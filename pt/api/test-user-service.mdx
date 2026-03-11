@@ -1,0 +1,32 @@
+---
+title: TestUserService
+description: Referência API para criar test users do Mercado Pago com TestUserService.
+---
+
+## Método
+
+```php
+create(array $payload): mixed
+```
+
+## Payload obrigatório
+
+- `site_id` deve ser um de `MLA`, `MLB`, `MLC`, `MLM`, `MLU`, `MCO`, `MPE`
+
+Opcional:
+
+- `description`
+
+## Exemplo
+
+```php
+$testUser = $testUserService->create([
+    'site_id' => 'MLA',
+    'description' => 'Local QA user',
+]);
+```
+
+## Páginas relacionadas
+
+- [Testing](/pt/guides/testing)
+- [Endpoint de test users](/pt/api/endpoints/test-users)

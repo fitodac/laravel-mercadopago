@@ -1,0 +1,47 @@
+---
+title: WebhookService
+description: Referência API para tratamento de webhooks e validação de assinaturas no Laravel MercadoPago.
+---
+
+## Método
+
+```php
+handle(Request $request): array
+```
+
+## Campos retornados
+
+- `acknowledged`
+- `validated`
+- `topic`
+- `resource`
+- `payload`
+
+## Regras de validação
+
+A validação da assinatura roda somente quando:
+
+- `MERCADOPAGO_WEBHOOK_SECRET` está configurado
+- `x-signature` está presente na request
+
+## Exemplo de saída
+
+```json
+{
+  "acknowledged": true,
+  "validated": true,
+  "topic": "payment",
+  "resource": "1234567890",
+  "payload": {
+    "type": "payment",
+    "data": {
+      "id": "1234567890"
+    }
+  }
+}
+```
+
+## Páginas relacionadas
+
+- [Lidar com webhooks](/pt/guides/handling-webhooks)
+- [Endpoint de webhooks](/pt/api/endpoints/webhooks)

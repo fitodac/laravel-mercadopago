@@ -1,0 +1,23 @@
+---
+title: Endpoint de payment methods
+description: Referência do endpoint demo para listar payment methods disponíveis.
+---
+
+## Disponibilidade
+
+Este endpoint só responde quando as demo routes estão habilitadas e o ambiente da app é `local` ou `testing`.
+
+## Rota
+
+```text
+GET /api/mercadopago/payment-methods
+```
+
+## Resposta
+
+Retorna a resposta normalizada do SDK para os payment methods disponíveis no contexto atual de credenciais.
+
+## Páginas relacionadas
+
+- [PaymentMethodService](/pt/api/payment-method-service)
+- [Testing](/pt/guides/testing)

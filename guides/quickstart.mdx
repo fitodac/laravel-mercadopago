@@ -1,206 +1,91 @@
 ---
-title: "Quickstart"
-description: "Get your first MercadoPago payment working in minutes"
-icon: "rocket"
+title: Quickstart
+description: Install the package, configure credentials, and create your first Mercado Pago preference in a Laravel project.
+icon: rocket
 ---
-
-This guide will walk you through installing the package, configuring credentials, and creating your first payment preference.
 
 ## Prerequisites
 
-Before you begin, ensure you have:
-
-- PHP `^8.2`
 - Laravel `^12.0`
-- A MercadoPago account with API credentials
+- PHP `^8.2`
+- Mercado Pago credentials
+- a local app running on `http://localhost:8000`
 
-## Installation
+## 1. Install the package
 
-<Steps>
-  <Step title="Install the package">
-    Add the package to your Laravel project using Composer:
+```bash
+composer require fitodac/laravel-mercadopago:^1.0
+```
 
-    ```bash
-    composer require fitodac/laravel-mercadopago:^1.0
-    ```
+## 2. Configure `.env`
 
-    The package uses Laravel's auto-discovery, so the service provider will be registered automatically.
+```ini
+APP_ENV=local
+MERCADOPAGO_ACCESS_TOKEN=TEST-your-access-token
+MERCADOPAGO_PUBLIC_KEY=TEST-your-public-key
+MERCADOPAGO_WEBHOOK_SECRET=test-secret
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+```
 
-  </Step>
+## 3. Verify routes
 
-  <Step title="Verify package registration">
-    Confirm the package is installed and routes are registered:
+```bash
+php artisan route:list --name=mercadopago
+```
 
-    ```bash
-    php artisan package:discover
-    php artisan route:list --name=mercadopago
-    ```
+## 4. Check package health
 
-    You should see routes like `mercadopago.preferences.store` and `mercadopago.webhooks.store`.
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
 
-  </Step>
+## 5. Create a preference
 
-  <Step title="Publish configuration (optional)">
-    If you want to customize the configuration file:
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/preferences \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "items": [
+      {
+        "title": "Starter product",
+        "quantity": 1,
+        "unit_price": 100.50
+      }
+    ],
+    "payer": {
+      "email": "buyer@example.com"
+    },
+    "back_urls": {
+      "success": "https://your-app.test/payments/success",
+      "pending": "https://your-app.test/payments/pending",
+      "failure": "https://your-app.test/payments/failure"
+    },
+    "notification_url": "https://your-app.test/api/mercadopago/webhooks",
+    "external_reference": "order-1001"
+  }'
+```
 
-    ```bash
-    php artisan vendor:publish --tag=mercadopago-config
-    ```
+Expected response shape:
 
-    This creates `config/mercadopago.php` in your project.
-
-  </Step>
-
-  <Step title="Configure environment variables">
-    Add your MercadoPago credentials to `.env`:
-
-    ```ini
-    MERCADOPAGO_ACCESS_TOKEN=your_access_token_here
-    MERCADOPAGO_PUBLIC_KEY=your_public_key_here
-    MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret_here
-    MERCADOPAGO_ENABLE_DEMO_ROUTES=true
-    ```
-
-    <Warning>
-      Never commit real credentials to your repository. Keep them in `.env` and add `.env` to `.gitignore`.
-    </Warning>
-
-  </Step>
-
-  <Step title="Test the configuration">
-    Verify your credentials are properly configured:
-
-    ```bash
-    curl http://localhost:8000/api/mercadopago/health
-    ```
-
-    Expected response:
-
-    ```json
-    {
-      "ok": true,
-      "data": {
-        "configured": true,
-        "has_public_key": true,
-        "has_webhook_secret": true,
-        "environment": "local"
-      },
-      "meta": []
-    }
-    ```
-
-  </Step>
-
-  <Step title="Create your first preference">
-    Use the demo endpoint to create a payment preference:
-
-    ```bash
-    curl --request POST \
-      --url http://localhost:8000/api/mercadopago/preferences \
-      --header 'Content-Type: application/json' \
-      --data '{
-        "items": [
-          {
-            "title": "My First Product",
-            "quantity": 1,
-            "unit_price": 100.50
-          }
-        ],
-        "payer": {
-          "email": "buyer@example.com"
-        },
-        "back_urls": {
-          "success": "https://your-app.test/payments/success",
-          "pending": "https://your-app.test/payments/pending",
-          "failure": "https://your-app.test/payments/failure"
-        },
-        "notification_url": "https://your-app.test/api/mercadopago/webhooks",
-        "external_reference": "order-1001"
-      }'
-    ```
-
-    You'll receive a response with:
-
-    ```json
-    {
-      "ok": true,
-      "data": {
-        "id": "1234567890-abc123def456",
-        "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=...",
-        "sandbox_init_point": "https://sandbox.mercadopago.com/checkout/v1/redirect?pref_id=..."
-      },
-      "meta": []
-    }
-    ```
-
-    <Tip>
-      The `init_point` URL is where you redirect users to complete payment in production. Use `sandbox_init_point` for testing.
-    </Tip>
-
-  </Step>
-</Steps>
-
-## Using services in your own controllers
-
-While demo routes are helpful for testing, in production you should inject services into your own controllers:
-
-```php
-<?php
-
-namespace App\Http\Controllers;
-
-use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-
-final class CheckoutController
+```json
 {
-    public function createPreference(
-        Request $request,
-        PreferenceService $preferenceService
-    ): JsonResponse {
-        $payload = $request->validate([
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.title' => ['required', 'string'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-        ]);
-
-        $preference = $preferenceService->create($payload);
-
-        return response()->json([
-            'id' => data_get($preference, 'id'),
-            'init_point' => data_get($preference, 'init_point'),
-        ], 201);
-    }
+  "ok": true,
+  "data": {
+    "id": "1234567890",
+    "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=...",
+    "sandbox_init_point": "https://sandbox.mercadopago.com/checkout/v1/redirect?pref_id=..."
+  },
+  "meta": []
 }
 ```
 
+## 6. Move from demo to production code
+
+Once the package is wired correctly, inject `PreferenceService` into your own controller and stop depending on the demo endpoint for user-facing flows.
+
 ## Next steps
 
-<CardGroup cols={2}>
-  <Card
-    title="Creating Preferences"
-    icon="file-invoice"
-    href="/guides/creating-preferences"
-  >
-    Learn about all preference options and customization
-  </Card>
-  <Card
-    title="Processing Payments"
-    icon="credit-card"
-    href="/guides/processing-payments"
-  >
-    Process direct payments with tokenized cards
-  </Card>
-  <Card
-    title="Handling Webhooks"
-    icon="webhook"
-    href="/guides/handling-webhooks"
-  >
-    Receive and validate payment notifications
-  </Card>
-  <Card title="Testing" icon="flask" href="/guides/testing">
-    Set up local testing with test users
-  </Card>
-</CardGroup>
+- [Creating preferences](/guides/creating-preferences)
+- [Handling webhooks](/guides/handling-webhooks)
+- [Testing](/guides/testing)

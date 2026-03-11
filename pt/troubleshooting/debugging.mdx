@@ -1,0 +1,77 @@
+---
+title: Debugging
+description: Use inspeção de rotas, revisão de config e smoke tests pequenos para depurar integrações com Laravel MercadoPago.
+---
+
+## Comece pelas rotas
+
+```bash
+php artisan route:list --name=mercadopago
+```
+
+Verifique se:
+
+- o prefixo corresponde a `MERCADOPAGO_ROUTE_PREFIX`
+- a rota de webhook existe
+- os nomes das demo routes estão presentes
+
+## Revise a configuração efetiva
+
+Inspecione o ambiente e a config publicada:
+
+```bash
+php artisan config:clear
+php artisan tinker
+```
+
+Dentro do Tinker:
+
+```php
+config('mercadopago')
+```
+
+## Use o health endpoint
+
+Em `local` ou `testing`:
+
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
+
+Isso confirma:
+
+- resolução do access token
+- se existe `publicKey`
+- se existe `webhookSecret`
+- ambiente Laravel atual
+
+## Depurar assinaturas de webhook
+
+Se a validação do webhook falhar:
+
+- registre o `x-signature` recebido
+- registre o `x-request-id` recebido
+- confirme que o payload contém `data.id`
+- confirme que o secret corresponde ao Mercado Pago
+
+## Depurar o uso de services na sua app
+
+Quando o seu próprio controller falhar, teste o service isoladamente:
+
+```php
+app(\Fitodac\LaravelMercadoPago\Services\PreferenceService::class)->create([
+    'items' => [
+        [
+            'title' => 'Debug item',
+            'quantity' => 1,
+            'unit_price' => 10,
+        ],
+    ],
+]);
+```
+
+## Páginas relacionadas
+
+- [Problemas comuns](/pt/troubleshooting/common-issues)
+- [Quickstart](/pt/guides/quickstart)
+- [Configuração da API](/pt/api/configuration)

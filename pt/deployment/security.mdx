@@ -1,0 +1,83 @@
+---
+title: Segurança
+description: Proteja o Laravel MercadoPago com o manejo correto de credenciais, validação de webhooks, HTTPS e padrões seguros para produção.
+---
+
+## Prioridades de segurança
+
+Para este pacote, os principais controles são:
+
+- proteger `MERCADOPAGO_ACCESS_TOKEN`
+- validar webhooks com `MERCADOPAGO_WEBHOOK_SECRET`
+- manter as demo routes fora do tráfego de produção
+- aplicar o seu próprio auth e autorização nos endpoints de negócio
+
+## Validação da assinatura do webhook
+
+Quando `MERCADOPAGO_WEBHOOK_SECRET` está configurado e existe `x-signature`, `WebhookService` valida a request.
+
+Entradas da validação:
+
+- `x-signature`
+- `x-request-id`
+- `data.id` vindo de query string ou payload
+
+Formato do manifesto:
+
+```text
+id:{resourceId};request-id:{requestId};ts:{timestamp};
+```
+
+O pacote calcula um HMAC-SHA256 e compara com `v1` do header.
+
+Se a validação falhar, o controller retorna `401`.
+
+## HTTPS
+
+Use HTTPS para qualquer webhook endpoint em produção.
+
+Se a sua app precisar forçar URLs HTTPS, você pode aplicar:
+
+```php
+public function boot(): void
+{
+    if ($this->app->environment('production')) {
+        \Illuminate\Support\Facades\URL::forceScheme('https');
+    }
+}
+```
+
+## Manejo de credenciais
+
+- mantenha credenciais em `.env` ou em um secret manager
+- faça rotação de credenciais por mudanças de ambiente, não por mudanças de código
+- nunca exponha `accessToken` ao frontend
+- exponha `publicKey` somente quando os fluxos frontend do Mercado Pago exigirem
+
+## Exposição dos endpoints demo
+
+Nunca trate os endpoints demo do pacote como uma business API pública.
+
+Eles intencionalmente não adicionam:
+
+- auth
+- autorização
+- throttling
+- validação de domínio
+- persistência
+
+## Padrão recomendado em produção
+
+Use o seu próprio controller e injete services do pacote:
+
+```php
+Route::middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
+    Route::post('/checkout/preferences', CheckoutPreferenceController::class);
+});
+```
+
+## Páginas relacionadas
+
+- [Deploy em produção](/pt/deployment/production)
+- [Credenciais](/pt/concepts/credentials)
+- [Guia de webhooks](/pt/guides/handling-webhooks)

@@ -1,403 +1,63 @@
 ---
-title: "Processing Payments"
-description: "Process direct payments with tokenized cards and retrieve payment status"
-icon: "credit-card"
+title: Processing payments
+description: Create direct card payments with PaymentService and understand the required payload fields.
 ---
 
-Unlike preferences that redirect users to MercadoPago's checkout, direct payments allow you to process card payments within your own application using tokenized card data.
+## Supported input
 
-## Payment flow overview
+`CreatePaymentRequest` requires:
 
-<Steps>
-  <Step title="Tokenize card data">
-    Use MercadoPago's JavaScript SDK (MercadoPago.js) to securely tokenize card information in the browser. This happens client-side and never exposes raw card data to your server.
-  </Step>
+- `transaction_amount`
+- `token`
+- `description`
+- `installments`
+- `payment_method_id`
+- `payer.email`
 
-<Step title="Send token to your backend">
-  Your frontend sends the card token and payment details to your Laravel
-  backend.
-</Step>
+Optional fields:
 
-<Step title="Create payment">
-  Your backend uses `PaymentService` to process the payment with MercadoPago's
-  API.
-</Step>
+- `issuer_id`
+- `payer.identification`
+- `metadata`
+- `external_reference`
+- `notification_url`
 
-  <Step title="Handle response">
-    Process the payment response and update your application state accordingly.
-  </Step>
-</Steps>
+## Service example
 
-## Creating payments
-
-<CodeGroup>
-```php Using PaymentService
-<?php
-
+```php
 use Fitodac\LaravelMercadoPago\Services\PaymentService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-
-final class MercadoPagoPaymentController
-{
-public function store(
-Request $request,
-PaymentService $paymentService
-): JsonResponse {
-$payload = $request->validate([
-'transaction_amount' => ['required', 'numeric', 'min:0.01'],
-'token' => ['required', 'string'],
-'description' => ['required', 'string'],
-'installments' => ['required', 'integer', 'min:1'],
-'payment_method_id' => ['required', 'string'],
-'payer' => ['required', 'array'],
-'payer.email' => ['required', 'email'],
-]);
-
-        $payment = $paymentService->create($payload);
-
-        return response()->json($payment, 201);
-    }
-
-}
-
-````
-
-```bash Using demo endpoint
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/payments \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "transaction_amount": 100.50,
-    "token": "CARD_TOKEN_FROM_JS_SDK",
-    "description": "Payment for order 1001",
-    "installments": 1,
-    "payment_method_id": "visa",
-    "payer": {
-      "email": "buyer@example.com"
-    }
-  }'
-````
-
-</CodeGroup>
-
-## Payment payload structure
-
-### Required fields
-
-```json
-{
-  "transaction_amount": 100.5,
-  "token": "CARD_TOKEN",
-  "description": "Payment description",
-  "installments": 1,
-  "payment_method_id": "visa",
-  "payer": {
-    "email": "buyer@example.com"
-  }
-}
-```
-
-### Complete payload example
-
-```json
-{
-  "transaction_amount": 250.0,
-  "token": "CARD_TOKEN_FROM_JS_SDK",
-  "description": "Premium subscription - Monthly",
-  "installments": 3,
-  "payment_method_id": "visa",
-  "issuer_id": 310,
-  "payer": {
-    "email": "customer@example.com",
-    "identification": {
-      "type": "DNI",
-      "number": "12345678"
-    }
-  },
-  "external_reference": "ORDER-12345",
-  "notification_url": "https://your-app.com/api/mercadopago/webhooks",
-  "metadata": {
-    "user_id": "98765",
-    "order_id": "12345"
-  }
-}
-```
-
-## Field validation rules
-
-| Field                  | Rule                          | Description                        |
-| ---------------------- | ----------------------------- | ---------------------------------- |
-| `transaction_amount`   | `required, numeric, min:0.01` | Payment amount                     |
-| `token`                | `required, string`            | Card token from JS SDK             |
-| `description`          | `required, string`            | Payment description                |
-| `installments`         | `required, integer, min:1`    | Number of installments             |
-| `payment_method_id`    | `required, string`            | Payment method (visa, master, etc) |
-| `issuer_id`            | `sometimes, integer`          | Card issuer ID                     |
-| `payer`                | `required, array`             | Payer information                  |
-| `payer.email`          | `required, email`             | Payer's email                      |
-| `payer.identification` | `sometimes, array`            | ID document                        |
-| `external_reference`   | `sometimes, string`           | Your order reference               |
-| `notification_url`     | `sometimes, url`              | Webhook URL                        |
-| `metadata`             | `sometimes, array`            | Custom metadata                    |
-
-<Note>
-  Validation rules are defined in `src/Http/Requests/CreatePaymentRequest.php`
-</Note>
-
-## Payment methods
-
-Common payment method IDs:
-
-- `visa` - Visa
-- `master` - Mastercard
-- `amex` - American Express
-- `debcabal` - Cabal Débito
-- `debmaster` - Maestro
-
-### Getting available payment methods
-
-Query available payment methods for your account:
-
-```php
-use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
-
-Route::get('/payment-methods', function (PaymentMethodService $service) {
-    return response()->json($service->all());
-});
-```
-
-Or use the demo endpoint:
-
-```bash
-curl http://localhost:8000/api/mercadopago/payment-methods
-```
-
-## Retrieving payment status
-
-After creating a payment, you can retrieve its current status:
-
-<CodeGroup>
-```php Using PaymentService
-use Fitodac\LaravelMercadoPago\Services\PaymentService;
-
-public function show(
-string $paymentId,
-    PaymentService $paymentService
-): JsonResponse {
-    $payment = $paymentService->get($paymentId);
-
-    return response()->json($payment);
-
-}
-
-````
-
-```bash Using demo endpoint
-curl http://localhost:8000/api/mercadopago/payments/123456789
-````
-
-</CodeGroup>
-
-## Payment response structure
-
-Successful payment creation returns:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": 123456789,
-    "status": "approved",
-    "status_detail": "accredited",
-    "transaction_amount": 100.50,
-    "currency_id": "ARS",
-    "description": "Payment for order 1001",
-    "payment_method_id": "visa",
-    "payment_type_id": "credit_card",
-    "installments": 1,
-    "date_created": "2026-03-10T10:30:00.000-03:00",
-    "date_approved": "2026-03-10T10:30:01.000-03:00",
-    "payer": {
-      "email": "buyer@example.com",
-      "identification": {...}
-    },
-    "card": {
-      "first_six_digits": "450995",
-      "last_four_digits": "3704",
-      "cardholder": {...}
-    },
-    "external_reference": "ORDER-12345"
-  },
-  "meta": []
-}
-```
-
-## Payment statuses
-
-| Status         | Description                                 |
-| -------------- | ------------------------------------------- |
-| `approved`     | Payment approved and credited               |
-| `pending`      | Payment pending (e.g., awaiting processing) |
-| `in_process`   | Payment being processed                     |
-| `rejected`     | Payment rejected                            |
-| `cancelled`    | Payment cancelled                           |
-| `refunded`     | Payment refunded                            |
-| `charged_back` | Payment charged back                        |
-
-### Status details
-
-The `status_detail` field provides additional context:
-
-- `accredited` - Payment successfully credited
-- `pending_contingency` - Pending review
-- `pending_review_manual` - Manual review required
-- `cc_rejected_bad_filled_card_number` - Invalid card number
-- `cc_rejected_bad_filled_date` - Invalid expiration date
-- `cc_rejected_bad_filled_security_code` - Invalid CVV
-- `cc_rejected_insufficient_amount` - Insufficient funds
-- `cc_rejected_high_risk` - Rejected by fraud prevention
-
-## Handling payment responses
-
-### Success scenario
-
-```php
-$payment = $paymentService->create($payload);
-
-if (data_get($payment, 'status') === 'approved') {
-    // Payment approved
-    Order::where('id', $orderId)->update([
-        'payment_id' => data_get($payment, 'id'),
-        'status' => 'paid',
-    ]);
-
-    return response()->json([
-        'success' => true,
-        'payment_id' => data_get($payment, 'id'),
-    ]);
-}
-```
-
-### Rejection scenario
-
-```php
-if (data_get($payment, 'status') === 'rejected') {
-    $detail = data_get($payment, 'status_detail');
-
-    return response()->json([
-        'success' => false,
-        'message' => 'Payment rejected',
-        'reason' => $detail,
-    ], 422);
-}
-```
-
-### Pending scenario
-
-```php
-if (in_array(data_get($payment, 'status'), ['pending', 'in_process'])) {
-    return response()->json([
-        'success' => true,
-        'pending' => true,
-        'message' => 'Payment is being processed',
-    ]);
-}
-```
-
-<Warning>
-  Never rely solely on the immediate payment response. Always implement webhook
-  handling for definitive payment status updates.
-</Warning>
-
-## Common patterns
-
-### Linking payments to orders
-
-```php
-$order = Order::findOrFail($request->order_id);
 
 $payment = $paymentService->create([
-    'transaction_amount' => $order->total,
-    'token' => $request->card_token,
-    'description' => "Payment for order {$order->id}",
-    'installments' => $request->installments,
-    'payment_method_id' => $request->payment_method_id,
+    'transaction_amount' => 150.75,
+    'token' => 'card-token',
+    'description' => 'Order #1001',
+    'installments' => 1,
+    'payment_method_id' => 'visa',
     'payer' => [
-        'email' => $order->customer_email,
+        'email' => 'buyer@example.com',
     ],
-    'external_reference' => "ORDER-{$order->id}",
-    'metadata' => [
-        'order_id' => $order->id,
-        'user_id' => auth()->id(),
-    ],
+    'external_reference' => 'order-1001',
 ]);
-
-if (data_get($payment, 'status') === 'approved') {
-    $order->update([
-        'mercadopago_payment_id' => data_get($payment, 'id'),
-        'status' => 'paid',
-    ]);
-}
 ```
 
-### Error handling
+## Demo endpoints
 
-```php
-try {
-    $payment = $paymentService->create($payload);
-
-    return response()->json([
-        'success' => true,
-        'payment' => $payment,
-    ]);
-} catch (\Exception $e) {
-    \Log::error('Payment creation failed', [
-        'error' => $e->getMessage(),
-        'payload' => $payload,
-    ]);
-
-    return response()->json([
-        'success' => false,
-        'message' => 'Payment processing failed',
-    ], 500);
-}
+```text
+POST /api/mercadopago/payments
+GET /api/mercadopago/payments/{paymentId}
+POST /api/mercadopago/payments/{paymentId}/refunds
 ```
 
-## Frontend integration notes
+## Recommended production flow
 
-<Tip>
-  This package handles backend payment processing. For frontend card
-  tokenization, you'll need to integrate MercadoPago.js separately. The package
-  provides `MERCADOPAGO_PUBLIC_KEY` for frontend use.
-</Tip>
+1. tokenize card data on the frontend with Mercado Pago tools
+2. send only the token and business-safe fields to your backend
+3. create the payment through `PaymentService`
+4. persist your own order state
+5. confirm the final payment state through webhooks
 
-Basic frontend flow:
+## Related pages
 
-1. Load MercadoPago.js with your public key
-2. Collect card data in your form
-3. Use `mp.createCardToken()` to tokenize card
-4. Send token to your Laravel backend
-5. Backend processes payment using `PaymentService`
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card
-    title="Handling Webhooks"
-    icon="webhook"
-    href="/guides/handling-webhooks"
-  >
-    Process payment status notifications
-  </Card>
-  <Card title="Refunds" icon="rotate-left" href="/guides/refunds">
-    Learn how to refund payments
-  </Card>
-  <Card
-    title="Managing Customers"
-    icon="users"
-    href="/guides/managing-customers"
-  >
-    Store customer data and cards
-  </Card>
-</CardGroup>
+- [PaymentService](/api/payment-service)
+- [Payments endpoint](/api/endpoints/payments)
+- [Refunds](/guides/refunds)

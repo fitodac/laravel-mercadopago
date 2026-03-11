@@ -1,311 +1,102 @@
 ---
-title: "Arquitectura"
-description: "Entendé la arquitectura y los principios de diseño del paquete Laravel MercadoPago"
+title: Arquitectura
+description: Revisá cómo se conectan el service provider, middleware, controllers, services y la configuración del SDK en Laravel MercadoPago.
 ---
 
-# Arquitectura del Paquete
+## Bloques del paquete
 
-Laravel MercadoPago está construido con principios de clean architecture, aprovechando el contenedor de servicios de Laravel, la inyección de dependencias y el auto-discovery para proveer una integración con Mercado Pago que es mantenible y fácil de probar.
+El paquete se apoya en cuatro capas:
 
-## Resumen Arquitectónico
+1. `LaravelMercadoPagoServiceProvider`
+2. capa HTTP para endpoints demo
+3. services que envuelven clientes del SDK de Mercado Pago
+4. clases de soporte para credenciales, configuración del SDK y normalización de respuestas
 
-El paquete usa una arquitectura en capas que separa responsabilidades y promueve la reutilización de código:
+## Responsabilidades del service provider
 
-<CardGroup cols={2}>
-  <Card title="Capa de Servicios" icon="cube">
-    Clases de servicio dedicadas para cada recurso de Mercado Pago
-  </Card>
-  <Card title="Capa de Soporte" icon="wrench">
-    Fábricas y clases de ayuda para manejar el cliente del SDK
-  </Card>
-  <Card title="Capa de Contratos" icon="file-contract">
-    Interfaces para extensibilidad y testing
-  </Card>
-  <Card title="Capa de DTOs" icon="database">
-    Objetos de Transferencia de Datos para un manejo tipado y seguro de credenciales
-  </Card>
-</CardGroup>
+`LaravelMercadoPagoServiceProvider` hace tres cosas:
 
-## Componentes Principales
+- mergea `config/mercadopago.php`
+- bindea `CredentialResolverInterface`
+- registra singleton services y rutas
 
-### Service Provider
+Singletons registrados:
 
-El `LaravelMercadoPagoServiceProvider` es el punto de entrada para registrar e inicializar el paquete.
+- `MercadoPagoClientFactory`
+- `SdkHttpClient`
+- `PreferenceService`
+- `PaymentService`
+- `RefundService`
+- `CustomerService`
+- `CardService`
+- `PaymentMethodService`
+- `WebhookService`
+- `TestUserService`
 
-**Ubicación**: `src/LaravelMercadoPagoServiceProvider.php`
+## Modelo de rutas
 
-```php
-final class LaravelMercadoPagoServiceProvider extends ServiceProvider
-{
-    public function register(): void
-    {
-        // Mezcla la configuración del paquete
-        $this->mergeConfigFrom(__DIR__ . '/../config/mercadopago.php', 'mercadopago');
-
-        // Enlaza el resolutor de credenciales
-        $this->app->bind(CredentialResolverInterface::class, EnvCredentialResolver::class);
-
-        // Registra los singletons
-        $this->app->singleton(MercadoPagoClientFactory::class);
-        $this->app->singleton(SdkHttpClient::class);
-        $this->app->singleton(PreferenceService::class);
-        $this->app->singleton(PaymentService::class);
-        // ... otros servicios
-    }
-
-    public function boot(Router $router): void
-    {
-        // Publica la configuración
-        $this->publishes([
-            __DIR__ . '/../config/mercadopago.php' => config_path('mercadopago.php'),
-        ], 'mercadopago-config');
-
-        // Registra el middleware y las rutas
-        $router->aliasMiddleware('mercadopago.demo', EnsureDemoRoutesEnabled::class);
-        $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
-    }
-}
-```
-
-### Auto-Discovery
-
-El paquete aprovecha la función de auto-discovery de Laravel. Cuando instalás el paquete vía Composer, Laravel automáticamente:
-
-1. Detecta el service provider en el `composer.json`
-2. Registra el service provider durante el arranque de la aplicación
-3. Enlaza todos los servicios al contenedor
-4. Carga las rutas y middlewares del paquete
-
-<Note>
-  No se necesita registrar el provider de manera manual. El paquete está listo para usar
-  inmediatamente después de la instalación.
-</Note>
-
-### Inyección de Dependencias
-
-Todos los servicios están registrados como singletons en el contenedor de servicios de Laravel, permitiendo una inyección de dependencias muy limpia:
+El paquete carga rutas desde `routes/api.php` bajo:
 
 ```php
-use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-
-class CheckoutController extends Controller
-{
-    public function __construct(
-        private PreferenceService $preferenceService
-    ) {}
-
-    public function create()
-    {
-        $preference = $this->preferenceService->create([
-            'items' => [/* ... */]
-        ]);
-    }
-}
+Route::prefix((string) config('mercadopago.route_prefix', 'api/mercadopago'))
+    ->name('mercadopago.')
 ```
 
-**Beneficios de registrarlos como singletons:**
+Las rutas se dividen en dos grupos:
 
-- Los servicios se instancian una sola vez por ciclo de petición (request)
-- Reduce el consumo de memoria y la sobrecarga de inicialización
-- Configuración del SDK compartida a través de todos los servicios
-- Resolución consistente de credenciales
+- ruta de webhook: siempre disponible
+- demo routes: protegidas por `mercadopago.demo`
 
-## Relación entre Componentes
+## Puerta de demo routes
 
-Así es cómo interactúan los componentes principales:
+`EnsureDemoRoutesEnabled` aborta con `404` salvo que:
 
-```mermaid
-graph TD
-    A[Service Provider] -->|Registra| B[Servicios]
-    A -->|Enlaza| C[CredentialResolverInterface]
-    A -->|Registra| D[MercadoPagoClientFactory]
+- `mercadopago.enable_demo_routes` sea `true`
+- el entorno de la app sea `local` o `testing`
 
-    B -->|Depende de| D
-    D -->|Usa| C
-    D -->|Configura| E[SDK de Mercado Pago]
+Eso mantiene las herramientas demo fuera del tráfico de producción, aunque las rutas sigan registradas.
 
-    C -->|Implementa| F[EnvCredentialResolver]
-    F -->|Lee de| G[Repositorio de Config]
+## Flujo de request
 
-    B -->|Devuelve| H[Respuestas del SDK]
-```
+Flujo típico de un demo endpoint:
 
-### Capa de Servicios
+1. un `FormRequest` valida el payload entrante
+2. un controller llama a un service del paquete
+3. el service usa `MercadoPagoClientFactory`
+4. el factory resuelve credenciales y configura el SDK
+5. `AbstractApiController` envuelve la respuesta como `{ ok, data, meta }`
 
-Cada servicio encapsula operaciones para un recurso específico de Mercado Pago:
+## Mapeo de errores
 
-- **PreferenceService** - Preferencias de pago 
-- **PaymentService** - Procesamiento de pagos 
-- **CustomerService** - Gestión de clientes 
-- **CardService** - Tarjetas de clientes 
-- **RefundService** - Operaciones de reembolsos 
-- **PaymentMethodService** - Medios de pago 
-- **WebhookService** - Validación de webhooks 
-- **TestUserService** - Creación de usuarios de prueba 
+`AbstractApiController` convierte excepciones en respuestas HTTP:
 
-### Capa de Soporte
+| Tipo de excepción | Status |
+| --- | --- |
+| `MPApiException` | status code del SDK |
+| `MercadoPagoConfigurationException` | `422` |
+| `InvalidWebhookSignatureException` | `401` |
+| `HttpExceptionInterface` | status code del framework |
+| Cualquier otra excepción | `500` |
 
-#### MercadoPagoClientFactory
+## Resolución de runtime environment
 
-La fábrica maneja la inicialización y configuración del cliente del SDK.
+`MercadoPagoClientFactory` define el runtime del SDK a partir de:
 
-**Ubicación**: `src/Support/MercadoPagoClientFactory.php`
+- `MERCADOPAGO_RUNTIME_ENVIRONMENT` cuando existe
+- si no, `local` para `local/testing`
+- si no, `server`
 
-**Responsabilidades clave:**
+## Camino del webhook
 
-1. **Configuración del SDK** - Configura el SDK de Mercado Pago con los tokens de acceso
-2. **Resolución del Cliente** - Instancia dinámicamente las clases del cliente del SDK
-3. **Compatibilidad de Métodos** - Maneja las diferencias entre versiones del SDK
-4. **Entorno de Ejecución** - Establece el entorno adecuado (local/server)
+`WebhookService` procesa requests de webhook así:
 
-```php
-public function makeFirstAvailable(array $clientClasses): object
-{
-    $this->configureSdk();
+- lee el payload
+- resuelve `webhookSecret`
+- valida `x-signature` cuando hay un secret configurado
+- devuelve `acknowledged`, `validated`, `topic`, `resource` y `payload`
 
-    foreach ($clientClasses as $clientClass) {
-        if (class_exists($clientClass)) {
-            return new $clientClass();
-        }
-    }
+## Páginas relacionadas
 
-    throw MercadoPagoConfigurationException::clientClassNotFound($clientClasses);
-}
-```
-
-<Accordion title="¿Por qué usar makeFirstAvailable?">
-El SDK de Mercado Pago de vez en cuando cambia los nombres de las clases entre versiones. El método `makeFirstAvailable` le permite al paquete soportar múltiples versiones del SDK intentando instanciar clientes desde un array de posibles nombres de clases.
-
-Esto asegura compatibilidad hacia atrás y hacia adelante sin requerir actualizaciones del paquete por cada cambio del SDK.
-</Accordion>
-
-#### SdkHttpClient
-
-Provee acceso HTTP de bajo nivel a la API de Mercado Pago para endpoints que el SDK no cubre o envuelve.
-
-**Usado por**: TestUserService para crear usuarios de prueba con llamadas directas a la API.
-
-### Capa de Contratos
-
-#### CredentialResolverInterface
-
-Define el contrato para la resolución de credenciales, lo cual habilita a que construyas implementaciones personalizadas.
-
-**Ubicación**: `src/Contracts/CredentialResolverInterface.php`
-
-```php
-interface CredentialResolverInterface
-{
-    public function resolve(): MercadoPagoCredentials;
-}
-```
-
-La implementación por defecto (`EnvCredentialResolver`) lee de la configuración de Laravel, pero vos podés enlazar tu propio resolutor para:
-
-- Obtener credenciales desde una base de datos
-- Gestionar configuraciones multi-tenant (multi-empresa)
-- Integraciones con Vault o administradores de secretos como AWS Secrets Manager
-- Resolución de credenciales por usuario
-
-### Capa de DTOs
-
-#### MercadoPagoCredentials
-
-Un Data Transfer Object de sólo lectura para manejar las credenciales con seguridad de tipos (type-safety).
-
-**Ubicación**: `src/DTO/MercadoPagoCredentials.php`
-
-```php
-final readonly class MercadoPagoCredentials
-{
-    public function __construct(
-        public string $accessToken,
-        public ?string $publicKey = null,
-        public ?string $webhookSecret = null,
-    ) {}
-}
-```
-
-## Manejo de Excepciones
-
-El paquete define excepciones propias para un mejor manejo de errores:
-
-### MercadoPagoConfigurationException
-
-Se lanza cuando:
-
-- El access token no existe
-- El SDK no está instalado
-- No se encuentra una clase del cliente
-- Un método del SDK no se encuentra
-
-### InvalidWebhookSignatureException
-
-Se lanza cuando:
-
-- El header de firma de un webhook está mal formado
-- La validación HMAC de firma ha fallado
-
-## Principios de Diseño
-
-### 1. Responsabilidad Única
-Cada clase de servicio maneja exactamente un tipo de recurso de Mercado Pago.
-
-### 2. Inversión de Dependencia
-Los servicios dependen de abstracciones (`CredentialResolverInterface`) en lugar de implementaciones concretas.
-
-### 3. Principio Abierto/Cerrado
-El paquete está abierto a extensiones (como implementar resolutores propios) pero cerrado a modificaciones (los servicios base no deben cambiarse).
-
-### 4. Segregación de Interfaces
-La interface de resolución tiene un solo método, para que tus implementaciones no carguen con lógica muerta.
-
-## Extender el Paquete
-
-### Resolutor de Credenciales Personalizado
-
-```php
-namespace App\Services;
-
-use Fitodac\LaravelMercadoPago\Contracts\CredentialResolverInterface;
-use Fitodac\LaravelMercadoPago\DTO\MercadoPagoCredentials;
-
-class DatabaseCredentialResolver implements CredentialResolverInterface
-{
-    public function resolve(): MercadoPagoCredentials
-    {
-        $credentials = \DB::table('payment_credentials')
-            ->where('provider', 'mercadopago')
-            ->first();
-
-        return new MercadoPagoCredentials(
-            accessToken: $credentials->access_token,
-            publicKey: $credentials->public_key,
-            webhookSecret: $credentials->webhook_secret,
-        );
-    }
-}
-```
-
-Enlazalo en `AppServiceProvider`:
-
-```php
-public function register()
-{
-    $this->app->bind(
-        CredentialResolverInterface::class,
-        DatabaseCredentialResolver::class
-    );
-}
-```
-
-## Próximos Pasos
-
-<CardGroup cols={2}>
-  <Card title="Servicios" icon="cube" href="/es/concepts/services">
-    Explorá todos los servicios disponibles y sus métodos
-  </Card>
-  <Card title="Credenciales" icon="key" href="/es/concepts/credentials">
-    Aprendé sobre gestión de credenciales y seguridad
-  </Card>
-</CardGroup>
+- [Services](/es/concepts/services)
+- [Credenciales](/es/concepts/credentials)
+- [Endpoint de webhook](/es/api/endpoints/webhooks)

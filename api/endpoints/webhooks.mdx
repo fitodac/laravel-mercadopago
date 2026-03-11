@@ -1,139 +1,37 @@
 ---
-title: "Webhooks API"
-description: "Receive and validate Mercado Pago webhook notifications"
-icon: "webhook"
+title: Webhooks endpoint
+description: Always-on endpoint reference for Mercado Pago webhook notifications.
 ---
 
-## Overview
+## Availability
 
-The Webhooks API endpoint receives and validates notifications from Mercado Pago about events such as payment updates, refunds, and other transaction-related activities. This endpoint is always active and is the primary way to receive real-time updates from Mercado Pago.
+This endpoint is always active in every environment.
 
-<Info>
-  Unlike other demo endpoints, the webhook endpoint is **always active** in all
-  environments and is essential for production use.
-</Info>
+## Route
 
-## Receive Webhook
-
-Receives and processes webhook notifications from Mercado Pago.
-
-### Endpoint
-
-```
+```text
 POST /api/mercadopago/webhooks
 ```
 
-### Request Headers
+## Accepted request data
 
-<ParamField header="x-signature" type="string">
-  HMAC signature for webhook validation. Format: `ts={timestamp},v1={hash}`
-  <Note>
-    Required when `MERCADOPAGO_WEBHOOK_SECRET` is configured. Used to verify the
-    authenticity of the webhook.
-  </Note>
-</ParamField>
+- `type`
+- `action`
+- `api_version`
+- `data.id`
+- `live_mode`
+- `user_id`
+- query string `topic`
 
-<ParamField header="x-request-id" type="string">
-  Unique request identifier from Mercado Pago. Required for signature
-  validation.
-</ParamField>
+## Signature validation
 
-### Query Parameters
+When `MERCADOPAGO_WEBHOOK_SECRET` is configured and `x-signature` is present, the package validates:
 
-<ParamField query="id" type="string">
-  Resource ID (alternative to data.id in body)
-</ParamField>
+- `x-signature`
+- `x-request-id`
+- `data.id`
 
-<ParamField query="topic" type="string">
-  Notification topic (alternative to type in body)
-</ParamField>
-
-### Request Body Parameters
-
-<ParamField path="action" type="string">
-  Action that triggered the notification (e.g., "payment.created",
-  "payment.updated")
-</ParamField>
-
-<ParamField path="api_version" type="string">
-  Mercado Pago API version
-</ParamField>
-
-<ParamField path="type" type="string">
-  Notification type/topic (e.g., "payment", "merchant_order")
-</ParamField>
-
-<ParamField path="data" type="object">
-  Notification data object
-  <Expandable title="Data properties">
-    <ParamField path="data.id" type="string">
-      ID of the resource that triggered the notification
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField path="live_mode" type="boolean">
-  Whether the notification is from production (true) or sandbox (false)
-</ParamField>
-
-<ParamField path="user_id" type="string">
-  Mercado Pago user ID
-</ParamField>
-
-### Request Example
-
-```json
-{
-  "action": "payment.updated",
-  "api_version": "v1",
-  "type": "payment",
-  "data": {
-    "id": "1234567890"
-  },
-  "live_mode": true,
-  "user_id": "987654321"
-}
-```
-
-### Response
-
-<ResponseField name="ok" type="boolean">
-  Indicates if the webhook was received successfully
-</ResponseField>
-
-<ResponseField name="data" type="object">
-  Processed webhook information
-  <Expandable title="Webhook response properties">
-    <ResponseField name="acknowledged" type="boolean">
-      Whether the webhook was acknowledged
-    </ResponseField>
-
-    <ResponseField name="validated" type="boolean">
-      Whether the webhook signature was validated
-      <Note>
-        Will be `false` if `MERCADOPAGO_WEBHOOK_SECRET` is not configured
-      </Note>
-    </ResponseField>
-
-    <ResponseField name="topic" type="string">
-      Notification topic (e.g., "payment", "merchant_order")
-    </ResponseField>
-
-    <ResponseField name="resource" type="string">
-      Resource ID that triggered the notification
-    </ResponseField>
-
-    <ResponseField name="payload" type="object">
-      Complete webhook payload received
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="meta" type="array">
-  Additional metadata (typically empty)
-</ResponseField>
-
-### Response Example
+## Success response
 
 ```json
 {
@@ -142,254 +40,13 @@ POST /api/mercadopago/webhooks
     "acknowledged": true,
     "validated": true,
     "topic": "payment",
-    "resource": "1234567890",
-    "payload": {
-      "action": "payment.updated",
-      "api_version": "v1",
-      "type": "payment",
-      "data": {
-        "id": "1234567890"
-      },
-      "live_mode": true,
-      "user_id": "987654321"
-    }
+    "resource": "1234567890"
   },
   "meta": []
 }
 ```
 
-### cURL Example
+## Related pages
 
-```bash
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/webhooks \
-  --header 'Content-Type: application/json' \
-  --header 'x-signature: ts=1234567890,v1=abcdef123456' \
-  --header 'x-request-id: unique-request-id' \
-  --data '{
-    "type": "payment",
-    "data": {
-      "id": "123"
-    }
-  }'
-```
-
-### Error Responses
-
-#### Invalid Signature (401)
-
-```json
-{
-  "ok": false,
-  "message": "Invalid webhook signature"
-}
-```
-
-#### General Error (500)
-
-```json
-{
-  "ok": false,
-  "message": "Error message describing what went wrong"
-}
-```
-
-## Signature Validation
-
-When `MERCADOPAGO_WEBHOOK_SECRET` is configured, the package validates the webhook signature to ensure authenticity.
-
-### Validation Process
-
-1. Extract `ts` (timestamp) and `v1` (hash) from `x-signature` header
-2. Get `x-request-id` from headers
-3. Get resource `id` from query string or request body `data.id`
-4. Construct manifest: `id={id}&request-id={request-id}&ts={ts}`
-5. Compute HMAC-SHA256 hash using webhook secret
-6. Compare computed hash with provided `v1` hash
-
-<Warning>
-  **Production Requirement**: Always configure `MERCADOPAGO_WEBHOOK_SECRET` in
-  production to ensure webhook authenticity and prevent unauthorized
-  notifications.
-</Warning>
-
-### Signature Header Format
-
-```
-x-signature: ts=1234567890,v1=abc123def456...
-```
-
-## Implementation Notes
-
-### Availability
-
-<Info>
-  The webhook endpoint is **always active** regardless of environment or demo
-  route settings. This is necessary to receive production notifications.
-</Info>
-
-### Controller Reference
-
-Implemented in: `src/Http/Controllers/Api/WebhookController.php:13`
-
-Request validation: `src/Http/Requests/StoreWebhookRequest.php:16`
-
-### Related Services
-
-- [WebhookService](/api/webhook-service) - Service layer for webhook processing and validation
-
-### Related Guides
-
-- [Webhook Integration](/guides/handling-webhooks) - Complete guide on webhook setup
-- [Webhook Security](/deployment/security) - Security best practices for webhooks
-
-## Webhook Topics
-
-Mercado Pago sends notifications for various events:
-
-| Topic                  | Description                            |
-| ---------------------- | -------------------------------------- |
-| `payment`              | Payment created, updated, or cancelled |
-| `merchant_order`       | Order created or updated               |
-| `subscription`         | Subscription events                    |
-| `point_integration_wh` | Point of sale integration events       |
-
-## Best Practices
-
-<Tip>
-  **Idempotency**: Mercado Pago may send duplicate notifications. Always check
-  if you've already processed a notification before taking action.
-</Tip>
-
-<Warning>
-  **Async Processing**: Process webhook notifications asynchronously using
-  queued jobs. Return a 200 response quickly to avoid timeouts.
-</Warning>
-
-<Note>
-  **Verify Resource**: Always fetch the actual resource from Mercado Pago to
-  verify its current state. Don't rely solely on webhook data for critical
-  operations.
-</Note>
-
-### Recommended Workflow
-
-1. **Receive webhook** → Return 200 immediately
-2. **Validate signature** → If configured
-3. **Dispatch job** → Process asynchronously
-4. **Fetch resource** → Get current state from Mercado Pago
-5. **Update database** → Persist the current state
-6. **Trigger actions** → Send emails, update orders, etc.
-
-### Example Production Implementation
-
-```php
-use Fitodac\LaravelMercadoPago\Services\WebhookService;
-use Fitodac\LaravelMercadoPago\Services\PaymentService;
-
-final class MercadoPagoWebhookController
-{
-    public function handle(
-        Request $request,
-        WebhookService $webhookService,
-        PaymentService $paymentService
-    ): JsonResponse {
-        // Validate webhook
-        $webhook = $webhookService->handle($request);
-
-        if (!$webhook['validated']) {
-            return response()->json(['error' => 'Invalid signature'], 401);
-        }
-
-        // Dispatch async job
-        if ($webhook['topic'] === 'payment') {
-            ProcessPaymentWebhook::dispatch($webhook['resource']);
-        }
-
-        return response()->json(['ok' => true]);
-    }
-}
-```
-
-### Example Queued Job
-
-```php
-use Fitodac\LaravelMercadoPago\Services\PaymentService;
-
-final class ProcessPaymentWebhook implements ShouldQueue
-{
-    public function __construct(private string $paymentId) {}
-
-    public function handle(PaymentService $paymentService): void
-    {
-        // Fetch current payment state
-        $payment = $paymentService->get($this->paymentId);
-
-        // Check if already processed
-        $localPayment = Payment::where('mercadopago_id', $this->paymentId)->first();
-
-        if ($localPayment && $localPayment->status === $payment['status']) {
-            return; // Already processed
-        }
-
-        // Update local database
-        $localPayment->update([
-            'status' => $payment['status'],
-            'status_detail' => $payment['status_detail'],
-        ]);
-
-        // Trigger business logic based on status
-        if ($payment['status'] === 'approved') {
-            // Send confirmation email, fulfill order, etc.
-        }
-    }
-}
-```
-
-## Configuration
-
-### Required Environment Variables
-
-```ini
-# Required for webhook validation
-MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret_here
-```
-
-### Configuring in Mercado Pago
-
-1. Go to your Mercado Pago dashboard
-2. Navigate to **Developers** → **Webhooks**
-3. Add your webhook URL: `https://your-domain.com/api/mercadopago/webhooks`
-4. Copy the **Secret** and set it as `MERCADOPAGO_WEBHOOK_SECRET`
-5. Select the events you want to receive
-
-## Testing Webhooks
-
-### Local Testing
-
-1. Use a tunneling service (ngrok, expose, etc.) to expose your local server:
-
-```bash
-ngrok http 8000
-```
-
-2. Configure the public URL in Mercado Pago's webhook settings
-
-3. Trigger test events from Mercado Pago dashboard or by performing test transactions
-
-### Manual Testing
-
-```bash
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/webhooks \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "type": "payment",
-    "data": {"id": "123"}
-  }'
-```
-
-<Note>
-  When testing locally without `MERCADOPAGO_WEBHOOK_SECRET`, the webhook will be
-  processed but `validated` will be `false`.
-</Note>
+- [WebhookService](/api/webhook-service)
+- [Handling webhooks](/guides/handling-webhooks)

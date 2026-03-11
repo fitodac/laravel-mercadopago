@@ -1,185 +1,31 @@
 ---
-title: "Customers API"
-description: "Puntos de Entrada URL para gestionar datos fiscales de la clientela y sus tarjetas anidadas"
-icon: "user"
+title: Endpoint de customers
+description: Referencia de endpoints demo para customers y customer cards.
 ---
 
-## Resumen
+## Disponibilidad
 
-La API de Customers aloja aquellas rutas destinadas a crear legajos crudos de clientes en la nube de MP, a recuperar sus datos y a gestionar la amalgama de tarjetas de crédito prepagas que hayan guardado. Útil en flujos de "suscripciones" y "one-click checkout".
+Estos endpoints solo responden cuando las demo routes están habilitadas y el entorno de la app es `local` o `testing`.
 
-<Warning>
-  Como norma inquebrantable de Seguridad, todas las URL listadas en este archivo nacen "Inertes" o dan Error 404 en el momento en que Laravel corra bajo modo Producción. 
-  Solo resucitan si configurás expresamente `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` y tu base corre en `APP_ENV=local|testing`.
-</Warning>
+## Rutas
 
-## Creación Limpia de Clientela
-
-Inventar un perfil nuevo.
-
-### Endpoint
-
-```
+```text
 POST /api/mercadopago/customers
-```
-
-### Parámetros Exigidos (JSON Payload)
-
-<ParamField path="email" type="string" required>
-  Email principal. Debe carecer de errores ortográficos, es el pivote de todo.
-</ParamField>
-
-<ParamField path="first_name" type="string">
-  Nombres de pila
-</ParamField>
-
-<ParamField path="last_name" type="string">
-  Apellidos y alias
-</ParamField>
-
-<ParamField path="phone" type="object">
-  Bloque Telefónico
-  <Expandable title="Propiedades Hija">
-    <ParamField path="phone.area_code" type="string">
-      Prefijo del país o estado
-    </ParamField>
-
-    <ParamField path="phone.number" type="string">
-      Línea de telefonía
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField path="identification" type="object">
-  Documento de Acreditación Institucional
-  <Expandable title="Sub-campos Identitarios">
-    <ParamField path="identification.type" type="string">
-      Nomenclatura ("DNI", "CPF", "CUIT")
-    </ParamField>
-
-    <ParamField path="identification.number" type="string">
-      ID Legal
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField path="default_address" type="object">
-  Localidad fiscal
-  <Expandable title="Sub-Niveles Address">
-    <ParamField path="default_address.zip_code" type="string">
-      Código Numérico Postal
-    </ParamField>
-
-    <ParamField path="default_address.street_name" type="string">
-      Boulevard o Calle
-    </ParamField>
-
-    <ParamField path="default_address.street_number" type="integer">
-      Altura en números
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField path="metadata" type="object">
-  Para esconder identificadores o rastreadores de tu propia aplicación en la respuesta JSON.
-</ParamField>
-
-### Objeto Resultante
-
-<ResponseField name="data" type="object">
-  El clon de los datos que ingresaste pero adosado a parámetros vitales del servidor.
-  <Expandable title="La Estructura Gigante de Customer">
-    <ResponseField name="id" type="string">
-      **Lo más importante**: La firma maestra larga (Ej: 14781-aaa111) del perfil. Guardala con recelo.
-    </ResponseField>
-    
-    <ResponseField name="cards" type="array">
-      Arreglo masivo y múltiple conteniendo sus métodos de abono y pago que ha linkeado previamente.
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
----
-
-## Buscando a un Cliente (`GET`)
-
-Acarrear un viejo cliente para mirar sus adentros usando su identificador encriptado.
-
-### Endpoint
-
-```
 GET /api/mercadopago/customers/{customerId}
-```
-
-### Patrón Obligatorio
-
-<ParamField path="customerId" type="string" required>
-  La estampa del perfil que devolvió la ruta POST de Creación de Clientela.
-</ParamField>
-
----
-
-## Anestesiando (Atando) una Tarjeta Tokenizada (`POST`)
-
-Amarrar tarjetas a los legajos perpetuamente.
-
-### Endpoint
-
-```
 POST /api/mercadopago/customers/{customerId}/cards
-```
-
-### Patrones de Ruta y Cuerpo
-
-<ParamField path="customerId" type="string" required>
-  ID alfanumérico del Comprador.
-</ParamField>
-
-<ParamField path="token" type="string" required>
-  La representación encriptada (`El Token de Cartón Seguro`).
-</ParamField>
-
-### Respuesta Otorgada
-
-<ResponseField name="data" type="object">
-  Tu tarjeta quedó subida a la nube.
-  <Expandable title="Datazo Vital Devueltos">
-    <ResponseField name="id" type="string">
-      El ID propio y minúsculo **para referirse de manera unívoca a ESE plástico**. (A diferencia del CustomerID, sirve para cobrar).
-    </ResponseField>
-
-    <ResponseField name="first_six_digits" type="string">
-      Descubrimiento primario (Por ej: 450995 de VISA Débito).
-    </ResponseField>
-
-    <ResponseField name="last_four_digits" type="string">
-      Identidad final de validación (terminada en 0014).
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
----
-
-## Retiro Espontáneo de un Medio de Abono (`DELETE`)
-
-Quitar de la nómina una tarjeta particular de las garras de suscripción en caliente.
-
-### Endpoint
-
-```
 DELETE /api/mercadopago/customers/{customerId}/cards/{cardId}
 ```
 
-### Path Parameters
+## Campo obligatorio para create customer
 
-<ParamField path="customerId" type="string" required>
-  El jefe macro.
-</ParamField>
+- `email`
 
-<ParamField path="cardId" type="string" required>
-  Id hijo en particular de un plástico (Obtenido en la creación o en un GET global).
-</ParamField>
+## Campo obligatorio para create card
 
-## Detalles de Operabilidad
+- `token`
 
-Al salir a jugar fuera del cajón de aserrín de Localhost (`APP_ENV=local`), deberás armar imperativamente un Controlador de Laravel vos mismo bajo un API Resource en tus propios archivos (`routes/api.php`) amparado por los escudos Middleware de Sessión o Tokenización CSRF (`auth:sanctum`), para evitar que intrusos te colapsen el Rate Limit subiendo tarjetitas ajenas.
+## Páginas relacionadas
+
+- [CustomerService](/es/api/customer-service)
+- [CardService](/es/api/card-service)
+- [Gestionar customers](/es/guides/managing-customers)

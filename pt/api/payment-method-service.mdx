@@ -1,0 +1,25 @@
+---
+title: PaymentMethodService
+description: Referência API para listar payment methods disponíveis do Mercado Pago.
+---
+
+## Método
+
+```php
+all(): mixed
+```
+
+## Exemplo
+
+```php
+$paymentMethods = $paymentMethodService->all();
+```
+
+## Notas
+
+Esse service é somente leitura. Ele é útil para formulários frontend de pagamento e para validar quais métodos estão disponíveis no contexto da sua conta Mercado Pago.
+
+## Páginas relacionadas
+
+- [Endpoint de payment methods](/pt/api/endpoints/payment-methods)
+- [Testing](/pt/guides/testing)

@@ -1,586 +1,77 @@
 ---
 title: Debugging
-description: Techniques and tools for debugging issues with the Laravel MercadoPago package
+description: Use route inspection, config checks, and small smoke tests to debug Laravel MercadoPago integrations.
 ---
 
-## Health Check Endpoint
-
-The package provides a health endpoint to verify your configuration.
-
-### Using the Health Endpoint
-
-<Note>
-  The health endpoint is only available when demo routes are enabled in `local`
-  or `testing` environments.
-</Note>
-
-```bash
-curl http://localhost:8000/api/mercadopago/health
-```
-
-**Successful response:**
-
-```json
-{
-  "ok": true,
-  "data": {
-    "configured": true,
-    "has_public_key": true,
-    "has_webhook_secret": true,
-    "environment": "local"
-  },
-  "meta": []
-}
-```
-
-**Configuration incomplete:**
-
-```json
-{
-  "ok": true,
-  "data": {
-    "configured": false,
-    "has_public_key": false,
-    "has_webhook_secret": false,
-    "environment": "local"
-  },
-  "meta": []
-}
-```
-
-### What the Health Check Validates
-
-| Field                | Meaning                                                                       |
-| -------------------- | ----------------------------------------------------------------------------- |
-| `configured`         | Access token is set                                                           |
-| `has_public_key`     | Public key is configured (optional but recommended for frontend integrations) |
-| `has_webhook_secret` | Webhook secret is configured (required for production)                        |
-| `environment`        | Current Laravel environment                                                   |
-
-<Warning>
-  If `configured` is `false`, most package functionality will fail. Add
-  `MERCADOPAGO_ACCESS_TOKEN` to your `.env` file.
-</Warning>
-
-## Route Inspection
-
-### List All Package Routes
-
-Verify that the package routes are properly registered:
+## Start with route inspection
 
 ```bash
 php artisan route:list --name=mercadopago
 ```
 
-**Expected output:**
+Check:
 
-```
-  POST   api/mercadopago/webhooks ................... mercadopago.webhooks.store
-  GET    api/mercadopago/health ..................... mercadopago.health
-  GET    api/mercadopago/payment-methods ............ mercadopago.payment-methods.index
-  POST   api/mercadopago/preferences ................ mercadopago.preferences.store
-  POST   api/mercadopago/payments ................... mercadopago.payments.store
-  GET    api/mercadopago/payments/{paymentId} ....... mercadopago.payments.show
-  POST   api/mercadopago/payments/{paymentId}/refunds mercadopago.payments.refund
-  POST   api/mercadopago/customers .................. mercadopago.customers.store
-  GET    api/mercadopago/customers/{customerId} ..... mercadopago.customers.show
-  POST   api/mercadopago/customers/{customerId}/cards mercadopago.customers.cards.store
-  DELETE api/mercadopago/customers/{customerId}/cards/{cardId} mercadopago.customers.cards.destroy
-  POST   api/mercadopago/test-users ................. mercadopago.test-users.store
-```
+- prefix matches `MERCADOPAGO_ROUTE_PREFIX`
+- webhook route exists
+- demo route names are present
 
-### Check Middleware Applied
+## Check effective configuration
 
-View detailed route information including middleware:
-
-```bash
-php artisan route:list --name=mercadopago --columns=method,uri,name,middleware
-```
-
-**Note the middleware:**
-
-- Webhook route: No middleware (must be publicly accessible)
-- Demo routes: `mercadopago.demo` middleware (restricts to local/testing environments)
-
-### Verify Route Prefix
-
-If routes aren't where you expect:
-
-```bash
-php artisan config:show mercadopago.route_prefix
-```
-
-Default: `api/mercadopago`
-
-Change it via environment variable:
-
-```ini
-MERCADOPAGO_ROUTE_PREFIX=api/payments/mp
-```
-
-## Log Inspection
-
-### Enable Laravel Logging
-
-Add debug logging to your own controllers when using package services:
-
-```php
-use Illuminate\Support\Facades\Log;
-use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-
-public function createPreference(Request $request, PreferenceService $service)
-{
-    $payload = $request->validated();
-
-    Log::channel('daily')->info('Creating MercadoPago preference', [
-        'payload' => $payload
-    ]);
-
-    try {
-        $preference = $service->create($payload);
-
-        Log::channel('daily')->info('Preference created successfully', [
-            'preference_id' => data_get($preference, 'id'),
-            'init_point' => data_get($preference, 'init_point')
-        ]);
-
-        return response()->json($preference, 201);
-    } catch (\Exception $e) {
-        Log::channel('daily')->error('Failed to create preference', [
-            'error' => $e->getMessage(),
-            'payload' => $payload
-        ]);
-
-        throw $e;
-    }
-}
-```
-
-### View Recent Logs
-
-```bash
-tail -f storage/logs/laravel.log
-```
-
-Or for the daily log:
-
-```bash
-tail -f storage/logs/laravel-$(date +%Y-%m-%d).log
-```
-
-### Webhook Logging
-
-Log webhook payloads for debugging:
-
-```php
-use Illuminate\Support\Facades\Log;
-use Fitodac\LaravelMercadoPago\Services\WebhookService;
-
-Route::post('/custom-webhook', function (Request $request, WebhookService $webhookService) {
-    Log::channel('daily')->info('Webhook received', [
-        'headers' => $request->headers->all(),
-        'payload' => $request->all()
-    ]);
-
-    try {
-        $result = $webhookService->handle($request);
-
-        Log::channel('daily')->info('Webhook processed', [
-            'validated' => $result['validated'],
-            'topic' => $result['topic'],
-            'resource' => $result['resource']
-        ]);
-
-        return response()->json($result);
-    } catch (\Exception $e) {
-        Log::channel('daily')->error('Webhook processing failed', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        throw $e;
-    }
-});
-```
-
-## Exception Handling
-
-### Package-Specific Exceptions
-
-The package throws two custom exceptions:
-
-#### MercadoPagoConfigurationException
-
-Thrown when configuration is invalid or incomplete.
-
-**Methods:**
-
-- `MercadoPagoConfigurationException::missingAccessToken()`
-- `MercadoPagoConfigurationException::sdkNotInstalled()`
-- `MercadoPagoConfigurationException::clientClassNotFound()`
-- `MercadoPagoConfigurationException::clientMethodNotFound()`
-
-**Example handling:**
-
-```php
-use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
-
-try {
-    $preference = $preferenceService->create($payload);
-} catch (MercadoPagoConfigurationException $e) {
-    Log::error('MercadoPago configuration error', [
-        'message' => $e->getMessage()
-    ]);
-
-    return response()->json([
-        'error' => 'Payment system is not properly configured'
-    ], 500);
-}
-```
-
-#### InvalidWebhookSignatureException
-
-Thrown when webhook signature validation fails.
-
-**Methods:**
-
-- `InvalidWebhookSignatureException::malformedHeader()`
-- `InvalidWebhookSignatureException::signatureMismatch()`
-
-**Example handling:**
-
-```php
-use Fitodac\LaravelMercadoPago\Exceptions\InvalidWebhookSignatureException;
-
-try {
-    $result = $webhookService->handle($request);
-} catch (InvalidWebhookSignatureException $e) {
-    Log::warning('Invalid webhook signature', [
-        'message' => $e->getMessage(),
-        'signature_header' => $request->header('x-signature'),
-        'request_id' => $request->header('x-request-id')
-    ]);
-
-    return response()->json([
-        'error' => 'Invalid signature'
-    ], 401);
-}
-```
-
-### Global Exception Handler
-
-Register package exceptions in `app/Exceptions/Handler.php`:
-
-```php
-use Fitodac\LaravelMercadoPago\Exceptions\MercadoPagoConfigurationException;
-use Fitodac\LaravelMercadoPago\Exceptions\InvalidWebhookSignatureException;
-use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-
-class Handler extends ExceptionHandler
-{
-    public function register(): void
-    {
-        $this->reportable(function (MercadoPagoConfigurationException $e) {
-            Log::critical('MercadoPago configuration error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-        });
-
-        $this->reportable(function (InvalidWebhookSignatureException $e) {
-            Log::warning('Invalid webhook signature attempt', [
-                'message' => $e->getMessage(),
-                'ip' => request()->ip()
-            ]);
-        });
-    }
-}
-```
-
-## SDK Error Debugging
-
-### Common SDK Exceptions
-
-The Mercado Pago SDK throws its own exceptions. Catch and log them:
-
-```php
-use MercadoPago\Exceptions\MPApiException;
-
-try {
-    $payment = $paymentService->create($payload);
-} catch (MPApiException $e) {
-    Log::error('MercadoPago API error', [
-        'status_code' => $e->getStatusCode(),
-        'message' => $e->getMessage(),
-        'api_response' => $e->getApiResponse(),
-        'payload' => $payload
-    ]);
-
-    return response()->json([
-        'error' => 'Payment failed',
-        'details' => $e->getMessage()
-    ], $e->getStatusCode());
-}
-```
-
-### Inspect SDK Responses
-
-Log full SDK responses for debugging:
-
-```php
-use Fitodac\LaravelMercadoPago\Services\PaymentService;
-
-$payment = $paymentService->create($payload);
-
-Log::debug('Payment created', [
-    'payment_id' => data_get($payment, 'id'),
-    'status' => data_get($payment, 'status'),
-    'status_detail' => data_get($payment, 'status_detail'),
-    'full_response' => $payment
-]);
-```
-
-### Enable SDK Debug Mode
-
-The SDK supports debug output. Configure it in your service provider or bootstrap:
-
-```php
-// Not recommended for production
-if (app()->environment('local')) {
-    // SDK-specific debug configuration
-    // Check SDK documentation for exact methods
-}
-```
-
-## Testing Webhook Signatures
-
-### Generate Test Signatures
-
-Create a test script to generate valid webhook signatures:
-
-```php
-// tests/Support/WebhookSignatureGenerator.php
-
-namespace Tests\Support;
-
-class WebhookSignatureGenerator
-{
-    public static function generate(string $dataId, string $requestId, string $secret): array
-    {
-        $timestamp = time();
-        $manifest = sprintf(
-            'id:%s;request-id:%s;ts:%d;',
-            $dataId,
-            $requestId,
-            $timestamp
-        );
-
-        $hash = hash_hmac('sha256', $manifest, $secret);
-
-        return [
-            'x-signature' => sprintf('ts=%d,v1=%s', $timestamp, $hash),
-            'x-request-id' => $requestId
-        ];
-    }
-}
-```
-
-**Use in tests:**
-
-```php
-use Tests\Support\WebhookSignatureGenerator;
-
-public function test_webhook_validates_signature()
-{
-    config(['mercadopago.webhook_secret' => 'test-secret']);
-
-    $headers = WebhookSignatureGenerator::generate(
-        dataId: '12345',
-        requestId: 'req-123',
-        secret: 'test-secret'
-    );
-
-    $response = $this->postJson('/api/mercadopago/webhooks?data.id=12345', [
-        'type' => 'payment',
-        'data' => ['id' => '12345']
-    ], $headers);
-
-    $response->assertOk();
-    $response->assertJson([
-        'acknowledged' => true,
-        'validated' => true
-    ]);
-}
-```
-
-## Configuration Debugging
-
-### Dump Current Configuration
-
-View all MercadoPago configuration values:
-
-```bash
-php artisan config:show mercadopago
-```
-
-**Or in code:**
-
-```php
-use Illuminate\Support\Facades\Config;
-
-$config = Config::get('mercadopago');
-dd($config);
-```
-
-### Check Environment Variables
-
-Verify environment variables are loaded:
-
-```bash
-php artisan tinker
-```
-
-```php
->>> config('mercadopago.access_token')
-=> "APP-1234567890..."
-
->>> config('mercadopago.enable_demo_routes')
-=> true
-
->>> app()->environment()
-=> "local"
-```
-
-### Clear All Caches
-
-When configuration changes don't take effect:
+Inspect your environment and published config:
 
 ```bash
 php artisan config:clear
-php artisan cache:clear
-php artisan route:clear
-php artisan view:clear
-composer dump-autoload
+php artisan tinker
 ```
 
-## Network Debugging
+Inside Tinker:
 
-### Test Webhook Connectivity
+```php
+config('mercadopago')
+```
 
-Verify your webhook endpoint is reachable:
+## Use the health endpoint
+
+In `local` or `testing`:
 
 ```bash
-curl -X POST https://your-domain.com/api/mercadopago/webhooks \
-  -H "Content-Type: application/json" \
-  -d '{"type":"payment","data":{"id":"123"}}' \
-  -v
+curl http://localhost:8000/api/mercadopago/health
 ```
 
-The `-v` flag shows full request/response headers.
+This confirms:
 
-### Use ngrok for Local Development
+- access token resolution
+- whether a `publicKey` exists
+- whether a `webhookSecret` exists
+- current Laravel environment
 
-1. Install ngrok: https://ngrok.com/download
+## Debug webhook signatures
 
-2. Start your Laravel app:
+If webhook validation fails:
 
-   ```bash
-   php artisan serve
-   ```
+- log the incoming `x-signature`
+- log the incoming `x-request-id`
+- confirm the payload includes `data.id`
+- confirm the secret matches Mercado Pago
 
-3. Start ngrok tunnel:
+## Debug service usage in your app
 
-   ```bash
-   ngrok http 8000
-   ```
-
-4. Use the ngrok URL in Mercado Pago:
-
-   ```
-   https://abc123.ngrok.io/api/mercadopago/webhooks
-   ```
-
-5. View webhook requests in ngrok dashboard:
-   ```
-   http://127.0.0.1:4040
-   ```
-
-<Note>
-  ngrok provides a web interface showing all webhook requests, headers, and
-  payloads - extremely useful for debugging.
-</Note>
-
-## Performance Debugging
-
-### Enable Query Logging
-
-While this package doesn't use database queries directly, log queries in your implementation:
+When your own controller fails, test the service in isolation:
 
 ```php
-use Illuminate\Support\Facades\DB;
-
-DB::enableQueryLog();
-
-// Your code here
-
-$queries = DB::getQueryLog();
-Log::info('Database queries', ['queries' => $queries]);
-```
-
-### Measure Response Times
-
-```php
-use Illuminate\Support\Facades\Log;
-
-$start = microtime(true);
-
-$preference = $preferenceService->create($payload);
-
-$duration = (microtime(true) - $start) * 1000; // milliseconds
-
-Log::info('Preference creation time', [
-    'duration_ms' => $duration,
-    'preference_id' => data_get($preference, 'id')
+app(\Fitodac\LaravelMercadoPago\Services\PreferenceService::class)->create([
+    'items' => [
+        [
+            'title' => 'Debug item',
+            'quantity' => 1,
+            'unit_price' => 10,
+        ],
+    ],
 ]);
-
-if ($duration > 1000) {
-    Log::warning('Slow MercadoPago API response', [
-        'duration_ms' => $duration
-    ]);
-}
 ```
 
-## IDE Debugging
+## Related pages
 
-### Xdebug Configuration
-
-Set breakpoints in your code:
-
-1. Install Xdebug in your PHP environment
-2. Configure `php.ini`:
-
-   ```ini
-   [xdebug]
-   xdebug.mode=debug
-   xdebug.client_host=127.0.0.1
-   xdebug.client_port=9003
-   ```
-
-3. Set breakpoints in your controllers or the package service classes
-4. Step through the code to inspect variables and execution flow
-
-<Note>
-  You can set breakpoints in vendor files (like package service classes) but
-  changes won't persist. Use this only for debugging.
-</Note>
-
-## Getting Help
-
-If you're still stuck:
-
-1. **Enable all logging** - Capture as much information as possible
-2. **Check the health endpoint** - Verify basic configuration
-3. **Review the logs** - Look for error messages and stack traces
-4. **Test in isolation** - Use Tinker or simple test routes to isolate the issue
-5. **Consult Common Issues** - See the [Common Issues](/troubleshooting/common-issues) guide
-6. **Report bugs** - Open an issue on GitHub with logs and reproduction steps
+- [Common issues](/troubleshooting/common-issues)
+- [Quickstart](/guides/quickstart)
+- [API configuration](/api/configuration)

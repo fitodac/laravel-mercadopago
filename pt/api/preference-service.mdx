@@ -1,0 +1,50 @@
+---
+title: PreferenceService
+description: Referência API para criar checkout preferences do Mercado Pago com PreferenceService.
+---
+
+## Método
+
+```php
+create(array $payload): mixed
+```
+
+## Chaves de payload aceitas
+
+- `items` obrigatório
+- `payer`
+- `back_urls`
+- `metadata`
+- `notification_url`
+- `external_reference`
+- `expires`
+- `expiration_date_from`
+- `expiration_date_to`
+
+## Exemplo
+
+```php
+$preference = $preferenceService->create([
+    'items' => [
+        [
+            'title' => 'Pro plan',
+            'quantity' => 1,
+            'unit_price' => 49.90,
+        ],
+    ],
+    'payer' => [
+        'email' => 'buyer@example.com',
+    ],
+]);
+```
+
+## Campos típicos de saída
+
+- `id`
+- `init_point`
+- `sandbox_init_point`
+
+## Páginas relacionadas
+
+- [Criar preferences](/pt/guides/creating-preferences)
+- [Endpoint de preferences](/pt/api/endpoints/preferences)

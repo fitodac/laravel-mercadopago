@@ -1,0 +1,42 @@
+---
+title: CustomerService
+description: Referência API para criar e consultar customers do Mercado Pago.
+---
+
+## Métodos
+
+```php
+create(array $payload): mixed
+get(string $customerId): mixed
+```
+
+## Campo obrigatório para create
+
+- `email`
+
+Opcionais:
+
+- `first_name`
+- `last_name`
+- `phone`
+- `identification`
+- `default_address`
+- `metadata`
+
+## Exemplo
+
+```php
+$customer = $customerService->create([
+    'email' => 'buyer@example.com',
+    'first_name' => 'Jane',
+    'last_name' => 'Doe',
+]);
+
+$sameCustomer = $customerService->get((string) data_get($customer, 'id'));
+```
+
+## Páginas relacionadas
+
+- [Gerenciar customers](/pt/guides/managing-customers)
+- [Endpoint de customers](/pt/api/endpoints/customers)
+- [CardService](/pt/api/card-service)

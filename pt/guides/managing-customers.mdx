@@ -1,0 +1,60 @@
+---
+title: Gerenciar customers
+description: Crie customers, consulte registros e gerencie saved cards com Laravel MercadoPago.
+---
+
+## Payload de customer
+
+`CreateCustomerRequest` suporta:
+
+- `email` obrigatório
+- `first_name` opcional
+- `last_name` opcional
+- `phone` opcional
+- `identification` opcional
+- `default_address` opcional
+- `metadata` opcional
+
+## Payload de card
+
+`StoreCustomerCardRequest` exige:
+
+- `token`
+
+## Exemplo com service
+
+```php
+use Fitodac\LaravelMercadoPago\Services\CardService;
+use Fitodac\LaravelMercadoPago\Services\CustomerService;
+
+$customer = $customerService->create([
+    'email' => 'buyer@example.com',
+    'first_name' => 'Jane',
+    'last_name' => 'Doe',
+]);
+
+$card = $cardService->create((string) data_get($customer, 'id'), [
+    'token' => 'card-token',
+]);
+```
+
+## Endpoints demo
+
+```text
+POST /api/mercadopago/customers
+GET /api/mercadopago/customers/{customerId}
+POST /api/mercadopago/customers/{customerId}/cards
+DELETE /api/mercadopago/customers/{customerId}/cards/{cardId}
+```
+
+## Casos de uso
+
+- salvar dados de customer antes de direct payments
+- associar tokenized cards para cobranças futuras
+- consultar o estado de um customer antes de um fluxo de suporte ou retry
+
+## Páginas relacionadas
+
+- [CustomerService](/pt/api/customer-service)
+- [CardService](/pt/api/card-service)
+- [Endpoint de customers](/pt/api/endpoints/customers)

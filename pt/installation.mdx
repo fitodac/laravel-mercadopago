@@ -1,0 +1,127 @@
+---
+title: Instalação
+description: Instale o Laravel MercadoPago, publique a configuração se necessário e verifique as rotas do pacote.
+---
+
+## Requisitos
+
+Antes de instalar o pacote, confirme que o seu projeto usa:
+
+- PHP `^8.2`
+- Laravel `^12.0`
+- Composer
+
+## Instalação padrão
+
+Instale o pacote em qualquer projeto Laravel:
+
+```bash
+composer require fitodac/laravel-mercadopago:^1.0
+```
+
+O Laravel faz auto-discovery de:
+
+```php
+Fitodac\LaravelMercadoPago\LaravelMercadoPagoServiceProvider::class
+```
+
+## Fluxo com `path repository`
+
+Se o pacote estiver dentro do mesmo workspace, adicione um `path` repository ao `composer.json` da aplicação host:
+
+```json
+{
+  "repositories": [
+    {
+      "type": "path",
+      "url": "plugins/laravel-mercadopago",
+      "options": {
+        "symlink": true
+      }
+    }
+  ]
+}
+```
+
+Depois instale com o mesmo comando:
+
+```bash
+composer require fitodac/laravel-mercadopago:^1.0
+```
+
+## Opcional: publicar configuração
+
+Você só precisa disso quando quiser ter `config/mercadopago.php` no seu projeto:
+
+```bash
+php artisan vendor:publish --tag=mercadopago-config
+```
+
+## Verificar o registro do pacote
+
+Execute:
+
+```bash
+php artisan package:discover
+php artisan route:list --name=mercadopago
+```
+
+Você deve ver nomes de rotas como:
+
+- `mercadopago.webhooks.store`
+- `mercadopago.health`
+- `mercadopago.preferences.store`
+- `mercadopago.payments.store`
+
+<Note>
+  As demo routes só respondem quando `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` e o
+  ambiente Laravel é `local` ou `testing`. A rota de webhook sempre é
+  registrada.
+</Note>
+
+## Configuração mínima no `.env`
+
+Defina pelo menos o access token:
+
+```ini
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-your-access-token
+MERCADOPAGO_PUBLIC_KEY=APP_USR-your-public-key
+MERCADOPAGO_WEBHOOK_SECRET=your-webhook-secret
+MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+MERCADOPAGO_RUNTIME_ENVIRONMENT=
+```
+
+<Warning>
+  Mantenha credenciais reais em `.env` ou em um secret manager. Nunca faça
+  commit delas no repositório.
+</Warning>
+
+## Primeira verificação
+
+Com demo routes habilitadas em `local` ou `testing`, chame:
+
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
+
+Formato esperado:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "configured": true,
+    "has_public_key": true,
+    "has_webhook_secret": true,
+    "environment": "local"
+  },
+  "meta": []
+}
+```
+
+## Próximos passos
+
+- Continue em [Configuração](/pt/configuration)
+- Execute o [Quickstart](/pt/guides/quickstart)
+- Revise a [Arquitetura](/pt/concepts/architecture)

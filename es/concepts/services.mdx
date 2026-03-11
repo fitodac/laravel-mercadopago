@@ -1,161 +1,81 @@
 ---
-title: "Servicios"
-description: "Un vistazo general de todos los servicios provistos en el paquete con sus relaciones"
+title: Services
+description: Entendé la capa reutilizable de services de Laravel MercadoPago y cuándo conviene inyectar services en lugar de usar endpoints demo.
 ---
 
-# Resumen de Servicios
+## Por qué importa la capa de services
 
-Laravel MercadoPago provee ocho clases de servicios dedicadas exclusivamente, cada una encargada de algún proceso fundamental de la interacción con la API de Mercado Pago. Todos nacen registrados como *Singletons* y podés invocarlos al inyectar su dependencia.
+El paquete está pensado para que tu aplicación consuma Mercado Pago mediante services inyectados, sin acoplar la lógica de negocio a controllers demo ni a detalles internos del SDK.
 
-## Arquitectura del Servicio
+## Métodos disponibles
 
-Los servicios persiguen un patrón de conducta claro:
+| Service | Métodos públicos |
+| --- | --- |
+| `PreferenceService` | `create(array $payload)` |
+| `PaymentService` | `create(array $payload)`, `get(string $paymentId)` |
+| `RefundService` | `create(string $paymentId, array $payload = [])` |
+| `CustomerService` | `create(array $payload)`, `get(string $customerId)` |
+| `CardService` | `create(string $customerId, array $payload)`, `delete(string $customerId, string $cardId)` |
+| `PaymentMethodService` | `all()` |
+| `WebhookService` | `handle(Request $request)` |
+| `TestUserService` | `create(array $payload)` |
 
-1. **Dependencia a MercadoPagoClientFactory** - Recurren a esta fábrica local para que interceda un cliente nativo SDK original.
-2. **Abstracciones del SDK** - Todos se enfocan en volver a los métodos originales de MP en código local súper amistoso y "Laravelizado".
-3. **Type Safety** - Usan y demandan entidades de retornos tipados.
+## Inyectar un service
 
-## Servicios Core Básicos
-
-### PreferenceService
-
-**Propósito**: Crear Preferencias de Pago del sistema Checkout Pro de Mercado Pago.
-
-**Ubicación**: `src/Services/PreferenceService.php`
-
-**Casos de uso**:
-- Cobros donde se saca al cliente de la plataforma
-- Definir métodos de cuotas con re-direccionamientos 
-
-```php
-public function create(array $payload): mixed
-```
-
-Crea las preferencias y devuelve datos como el `init_point` que necesitas para la url a re-dirigir.
-
-**Ejemplo**:
+Usá los services directamente en tu propio controller:
 
 ```php
 use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
-class CheckoutController
+final class CheckoutController
 {
-    public function createCheckout(PreferenceService $service)
-    {
-        $preference = $service->create([
-            'items' => [
-                [
-                    'title' => 'Suscripción Premium',
-                    'quantity' => 1,
-                    'unit_price' => 99.99,
-                    'currency_id' => 'ARS'
-                ]
-            ],
-            // ... variables complementarias
+    public function store(
+        Request $request,
+        PreferenceService $preferenceService,
+    ): JsonResponse {
+        $payload = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.title' => ['required', 'string'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
-        return redirect($preference->init_point);
+        $preference = $preferenceService->create($payload);
+
+        return response()->json([
+            'id' => data_get($preference, 'id'),
+            'init_point' => data_get($preference, 'init_point'),
+        ], 201);
     }
 }
 ```
 
-### PaymentService
+## Cuándo usar services y cuándo endpoints demo
 
-**Propósito**: Procesar todos aquellos cobros hechos directamente en los componentes propios o Checkout Transparentes.
+Usá services cuando:
 
-**Casos de uso**:
-- Cobros por tarjeta integrados mediante el SDK de Frontend sin redireccionar la página
-- Traer históricos (Get) de pago
+- estés armando flujos de producción
+- necesites tu propio auth o rate limiting
+- quieras persistir orders o payments
+- necesites validación o reglas de negocio propias
 
-**Ejemplos Reales**:
+Usá endpoints demo cuando:
 
-```php
-public function process(PaymentService $service, Request $request)
-{
-    $payment = $service->create([
-        'transaction_amount' => 150.00,
-        'token' => $request->token, // Generado front-end
-        'installments' => 1,
-        'payment_method_id' => 'visa',
-        'payer' => ['email' => $request->email]
-    ]);
+- estés probando el cableado del paquete en local
+- necesites smoke tests rápidos de conectividad con el SDK
+- quieras ejemplos simples de integración
 
-    return response()->json([
-        'status' => $payment->status,
-        'id' => $payment->id
-    ]);
-}
-```
+## Detalles de comportamiento
 
-### CustomerService
+- `RefundService::create()` llama a `refund()` cuando existe `amount` y a `refundTotal()` si no
+- `CardService` usa el customer card client y solo soporta alta y baja de cards
+- `TestUserService` usa `SdkHttpClient` porque test user creation no está expuesto por el mismo cliente high-level
+- `WebhookService` valida firmas solo cuando existen `MERCADOPAGO_WEBHOOK_SECRET` y `x-signature`
 
-**Propósito**: Dar de alta o verificar entidades para que MP registre a las personas.
+## Páginas relacionadas
 
-**Ubicación**: `src/Services/CustomerService.php`
-
-Se lo usa mayoritariamente al intentar lograr escenarios del estilo "Pagos En Un Sólo Clic", donde necesitamos de un "Customer" fijo para asignar tarjetas de cuenta.
-
-### CardService
-
-**Propósito**: Registrar métodos de cobros atados a los "Customers" del punto anterior.
-
-**Ejemplo de cobro suscripción (Tokenización)**:
-
-```php
-public function destroy(CardService $service, string $cardId)
-{
-    $customerId = auth()->user()->mp_customer_id;
-    $service->delete($customerId, $cardId);
-
-    return response()->json(['message' => 'Tarjeta extirpada y eliminada para el comprador local.']);
-}
-```
-
-<Tip>
- No podés adjuntar tarjetas si el Customer anterior falla de crearse. Acordate de ejecutar esa función de precondición primero.
-</Tip>
-
-### RefundService
-
-**Propósito**: Emitir devoluciones totales y parciales sobre facturas de pagos generadas.
-
-Si pasás el monto vacío devuelve en total el dinero, si aplicás un `amount` a la variable se toma por reembolso fragmentario.
-
-```php
-//Total
-$refund = $this->refundService->create($paymentId);
-
-//Parcial 
-$refund = $this->refundService->create($paymentId, ['amount' => 500]);
-```
-
-### PaymentMethodService
-
-Te enlista las distintas formas viables y activas que tenés de recibir cobros sobre un País predefinido. 
-
-Se lo utiliza frecuentemente en los front-end modernos para consultar de forma asíncrona los logotipos y promociones sin recargar página (`$this->paymentMethodService->all()`).
-
-### WebhookService
-
-**Propósito**: Validador principal al momento de la llegada de alertas desde el mundo exterior de MP.
-
-Devolverá un arreglo saneado y un control que acusa o deniega la verificación `HMAC`:
-
-```php
-$webhook = $this->webhookService->handle($request);
-
-if ($webhook['validated']) {
-    // Fue comprobada la seguridad
-}
-```
-
-## Próximos pasos
-
-<CardGroup cols={2}>
-  <Card title="Conceptos de Arquitectura" icon="cube" href="/es/concepts/architecture">
-    Repasá su funcionamiento basal.
-  </Card>
-  <Card title="Manejador de Webhooks" icon="webhook" href="/es/guides/handling-webhooks">
-    Lee cómo implementar tus alertas.
-  </Card>
-</CardGroup>
+- [Inicio rápido](/es/guides/quickstart)
+- [PaymentService](/es/api/payment-service)
+- [WebhookService](/es/api/webhook-service)

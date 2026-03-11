@@ -1,291 +1,49 @@
 ---
-title: "Preferences API"
-description: "Create payment preferences for Mercado Pago checkout integration"
-icon: "receipt"
+title: Preferences endpoint
+description: Demo endpoint reference for creating checkout preferences.
 ---
 
-## Overview
+## Availability
 
-The Preferences API allows you to create payment preferences that define the items, amounts, and configuration for a Mercado Pago checkout experience. Preferences are used to initialize the Mercado Pago checkout flow.
+This endpoint only responds when demo routes are enabled and the app environment is `local` or `testing`.
 
-<Warning>
-  This endpoint is only available in `local` and `testing` environments when
-  `MERCADOPAGO_ENABLE_DEMO_ROUTES=true`. It is automatically disabled in
-  production.
-</Warning>
+## Route
 
-## Create Preference
-
-Creates a new payment preference with items and configuration.
-
-### Endpoint
-
-```
+```text
 POST /api/mercadopago/preferences
 ```
 
-### Request Parameters
+## Required fields
 
-<ParamField path="items" type="array" required>
-  Array of items to be purchased. Must contain at least one item.
-  <Expandable title="Item properties">
-    <ParamField path="items.*.title" type="string" required>
-      Item title or description
-    </ParamField>
+- `items[].title`
+- `items[].quantity`
+- `items[].unit_price`
 
-    <ParamField path="items.*.quantity" type="integer" required>
-      Quantity of items. Minimum value: 1
-    </ParamField>
+## Optional fields
 
-    <ParamField path="items.*.unit_price" type="numeric" required>
-      Price per unit. Minimum value: 0
-    </ParamField>
-  </Expandable>
-</ParamField>
+- `payer`
+- `back_urls`
+- `metadata`
+- `notification_url`
+- `external_reference`
+- `expires`
+- `expiration_date_from`
+- `expiration_date_to`
 
-<ParamField path="payer" type="object">
-  Payer information
-  <Expandable title="Payer properties">
-    <ParamField path="payer.email" type="string">
-      Payer email address
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField path="back_urls" type="object">
-  URLs to redirect after payment completion
-  <Expandable title="URL properties">
-    <ParamField path="back_urls.success" type="string">
-      URL for successful payment
-    </ParamField>
-
-    <ParamField path="back_urls.pending" type="string">
-      URL for pending payment
-    </ParamField>
-
-    <ParamField path="back_urls.failure" type="string">
-      URL for failed payment
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField path="notification_url" type="string">
-  URL for webhook notifications. Must be a valid URL.
-</ParamField>
-
-<ParamField path="external_reference" type="string">
-  Your internal reference ID for this preference
-</ParamField>
-
-<ParamField path="metadata" type="object">
-  Custom metadata object for additional information
-</ParamField>
-
-<ParamField path="expires" type="boolean">
-  Whether the preference has an expiration date
-</ParamField>
-
-<ParamField path="expiration_date_from" type="date">
-  Start date for preference validity
-</ParamField>
-
-<ParamField path="expiration_date_to" type="date">
-  End date for preference validity
-</ParamField>
-
-### Request Example
-
-```json
-{
-  "items": [
-    {
-      "title": "Producto demo",
-      "quantity": 1,
-      "unit_price": 100.5
-    }
-  ],
-  "payer": {
-    "email": "buyer@example.com"
-  },
-  "back_urls": {
-    "success": "https://tu-app.test/pagos/exito",
-    "pending": "https://tu-app.test/pagos/pendiente",
-    "failure": "https://tu-app.test/pagos/error"
-  },
-  "notification_url": "https://tu-app.test/api/mercadopago/webhooks",
-  "external_reference": "pedido-1001"
-}
-```
-
-### Response
-
-Returns the created preference object from Mercado Pago.
-
-<ResponseField name="ok" type="boolean">
-  Indicates if the request was successful
-</ResponseField>
-
-<ResponseField name="data" type="object">
-  The preference object returned by Mercado Pago
-  <Expandable title="Preference properties">
-    <ResponseField name="id" type="string">
-      Unique preference identifier
-    </ResponseField>
-
-    <ResponseField name="init_point" type="string">
-      URL to initialize the checkout in production
-    </ResponseField>
-
-    <ResponseField name="sandbox_init_point" type="string">
-      URL to initialize the checkout in sandbox/testing
-    </ResponseField>
-
-    <ResponseField name="items" type="array">
-      Array of items included in the preference
-    </ResponseField>
-
-    <ResponseField name="payer" type="object">
-      Payer information
-    </ResponseField>
-
-    <ResponseField name="back_urls" type="object">
-      Configured back URLs
-    </ResponseField>
-
-    <ResponseField name="notification_url" type="string">
-      Webhook notification URL
-    </ResponseField>
-
-    <ResponseField name="external_reference" type="string">
-      Your internal reference ID
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-<ResponseField name="meta" type="array">
-  Additional metadata (typically empty)
-</ResponseField>
-
-### Response Example
+## Success response
 
 ```json
 {
   "ok": true,
   "data": {
-    "id": "123456789-abc123-def456-ghi789",
-    "init_point": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=123456789-abc123",
-    "sandbox_init_point": "https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=123456789-abc123",
-    "items": [
-      {
-        "id": "item-001",
-        "title": "Producto demo",
-        "quantity": 1,
-        "unit_price": 100.5
-      }
-    ],
-    "payer": {
-      "email": "buyer@example.com"
-    },
-    "back_urls": {
-      "success": "https://tu-app.test/pagos/exito",
-      "pending": "https://tu-app.test/pagos/pendiente",
-      "failure": "https://tu-app.test/pagos/error"
-    },
-    "notification_url": "https://tu-app.test/api/mercadopago/webhooks",
-    "external_reference": "pedido-1001"
+    "id": "1234567890",
+    "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=..."
   },
   "meta": []
 }
 ```
 
-### cURL Example
+## Related pages
 
-```bash
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/preferences \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "items": [
-      {
-        "title": "Producto demo",
-        "quantity": 1,
-        "unit_price": 100.5
-      }
-    ]
-  }'
-```
-
-### Error Response
-
-```json
-{
-  "ok": false,
-  "message": "Error message describing what went wrong"
-}
-```
-
-## Implementation Notes
-
-### Availability
-
-This endpoint is protected by the `mercadopago.demo` middleware and only responds when:
-
-- `MERCADOPAGO_ENABLE_DEMO_ROUTES=true` in configuration
-- Application environment is `local` or `testing`
-
-In production or when demo routes are disabled, this endpoint returns `404`.
-
-### Controller Reference
-
-Implemented in: `src/Http/Controllers/Api/PreferenceController.php:14`
-
-Request validation: `src/Http/Requests/CreatePreferenceRequest.php:16`
-
-### Related Services
-
-- [PreferenceService](/api/preference-service) - Service layer for preference operations
-
-### Related Guides
-
-- [Creating Preferences](/guides/creating-preferences) - Complete guide on creating payment preferences
-- [Checkout Integration](/guides/creating-preferences) - Integrate Mercado Pago checkout in your application
-
-## Best Practices
-
-<Tip>
-  **Production Usage**: For production environments, create your own controllers
-  that inject the `PreferenceService` and implement your application's
-  authentication, authorization, and business logic.
-</Tip>
-
-<Warning>
-  **Security**: Demo routes are for development and testing only. Never expose
-  them in production environments.
-</Warning>
-
-### Example Production Controller
-
-```php
-use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-
-final class CheckoutPreferenceController
-{
-    public function store(Request $request, PreferenceService $preferenceService): JsonResponse
-    {
-        $payload = $request->validate([
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.title' => ['required', 'string'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'external_reference' => ['sometimes', 'string'],
-        ]);
-
-        $preference = $preferenceService->create($payload);
-
-        return response()->json([
-            'id' => data_get($preference, 'id'),
-            'init_point' => data_get($preference, 'init_point'),
-        ], 201);
-    }
-}
-```
+- [PreferenceService](/api/preference-service)
+- [Creating preferences](/guides/creating-preferences)

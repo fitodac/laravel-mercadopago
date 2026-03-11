@@ -1,0 +1,76 @@
+---
+title: Deploy em produção
+description: Prepare o Laravel MercadoPago para produção com as variáveis corretas, webhook configurado e verificações finais.
+---
+
+## Objetivos de produção
+
+Em produção, a configuração do pacote deve:
+
+- usar credenciais reais do Mercado Pago
+- manter as demo routes indisponíveis
+- aceitar webhooks por HTTPS
+- validar assinaturas de webhook
+
+## `.env` recomendado
+
+```ini
+APP_ENV=production
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-your-production-access-token
+MERCADOPAGO_PUBLIC_KEY=APP_USR-your-production-public-key
+MERCADOPAGO_WEBHOOK_SECRET=your-production-webhook-secret
+MERCADOPAGO_ROUTE_PREFIX=api/mercadopago
+MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+MERCADOPAGO_RUNTIME_ENVIRONMENT=server
+```
+
+## Verificações obrigatórias
+
+1. Confirme que a webhook URL aponta para o seu domínio real com HTTPS.
+2. Confirme que `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`.
+3. Confirme que `MERCADOPAGO_WEBHOOK_SECRET` corresponde ao valor no Mercado Pago.
+4. Limpe e regenere o cache de config após alterar secrets.
+
+## Expectativa das rotas
+
+Execute:
+
+```bash
+php artisan route:list --name=mercadopago
+```
+
+A lista ainda mostra as demo routes, mas requests para elas devem retornar `404` em produção por causa de `EnsureDemoRoutesEnabled`.
+
+A rota de webhook deve continuar ativa:
+
+```text
+POST /api/mercadopago/webhooks
+```
+
+## Checklist de deploy
+
+- [ ] `MERCADOPAGO_ACCESS_TOKEN` está definido
+- [ ] `MERCADOPAGO_PUBLIC_KEY` está definido se você usa tokenização no frontend
+- [ ] `MERCADOPAGO_WEBHOOK_SECRET` está definido
+- [ ] `MERCADOPAGO_ENABLE_DEMO_ROUTES=false`
+- [ ] HTTPS está habilitado
+- [ ] o cache de config foi atualizado
+- [ ] a webhook URL está configurada no Mercado Pago
+
+## Smoke tests
+
+Depois do deploy:
+
+```bash
+php artisan config:clear
+php artisan route:list --name=mercadopago
+curl -X POST https://your-domain.com/api/mercadopago/webhooks -H 'Content-Type: application/json' -d '{}'
+```
+
+Espere que o endpoint de webhook responda, mesmo que o payload ainda não seja útil para a regra de negócio.
+
+## Páginas relacionadas
+
+- [Segurança](/pt/deployment/security)
+- [Endpoint de webhook](/pt/api/endpoints/webhooks)
+- [Problemas comuns](/pt/troubleshooting/common-issues)

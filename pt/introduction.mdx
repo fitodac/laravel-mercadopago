@@ -1,0 +1,97 @@
+---
+title: Introdução
+description: Entenda o que o pacote Laravel MercadoPago inclui, o que ele não inclui e como ele se encaixa em uma aplicação Laravel.
+---
+
+## Visão geral
+
+Laravel MercadoPago é um pacote reutilizável para projetos Laravel 12 que precisam de uma camada de integração clara com o Mercado Pago.
+
+Ele registra:
+
+- `LaravelMercadoPagoServiceProvider` por meio do auto-discovery do Laravel
+- `config/mercadopago.php`
+- services singleton para operações do Mercado Pago
+- endpoints JSON demo sob um prefixo configurável
+- um endpoint de webhook sempre ativo
+
+## O que o pacote resolve
+
+- Resolve credenciais a partir da configuração por meio de `CredentialResolverInterface`
+- Configura o access token do SDK do Mercado Pago e o runtime environment
+- Encapsula clientes do SDK em services injetáveis do Laravel
+- Normaliza respostas dos services em envelopes JSON consistentes para os endpoints demo
+- Valida assinaturas de webhook quando `MERCADOPAGO_WEBHOOK_SECRET` está configurado
+
+## Services incluídos
+
+| Service | Finalidade |
+| --- | --- |
+| `PreferenceService` | Criar checkout preferences |
+| `PaymentService` | Criar e consultar payments |
+| `RefundService` | Processar full refunds e partial refunds |
+| `CustomerService` | Criar e consultar customers |
+| `CardService` | Adicionar e remover customer cards |
+| `PaymentMethodService` | Listar payment methods disponíveis |
+| `WebhookService` | Processar payloads de webhook e validar assinaturas |
+| `TestUserService` | Criar test users do Mercado Pago |
+
+## O que o pacote não inclui
+
+- Migrações de banco de dados
+- Componentes UI de checkout
+- Persistência de payments no banco da sua aplicação
+- Autenticação ou autorização para os seus endpoints de negócio
+- Queue workers, retries ou armazenamento de webhooks
+
+<Warning>
+  Os endpoints demo são ferramentas de apoio. Para fluxos de produção, injete os
+  services nos seus próprios controllers, jobs ou actions e aplique suas regras
+  de auth, validação e persistência.
+</Warning>
+
+## Requisitos
+
+- PHP `^8.2`
+- Componentes Laravel `^12.0`
+- `mercadopago/dx-php ^3.8`
+
+## Envelope de resposta
+
+Os demo controllers do pacote retornam JSON neste formato:
+
+```json
+{
+  "ok": true,
+  "data": {},
+  "meta": []
+}
+```
+
+As falhas retornam:
+
+```json
+{
+  "ok": false,
+  "message": "Mercado Pago access token is not configured."
+}
+```
+
+Respostas de `MPApiException` também podem incluir `details` com o conteúdo retornado pelo SDK.
+
+## Próximos passos
+
+<CardGroup cols={2}>
+  <Card title="Instalação" icon="download" href="/pt/installation">
+    Instale o pacote e confirme que as rotas estejam disponíveis.
+  </Card>
+  <Card title="Configuração" icon="gear" href="/pt/configuration">
+    Configure credenciais, route prefix e runtime behavior.
+  </Card>
+  <Card title="Arquitetura" icon="diagram-project" href="/pt/concepts/architecture">
+    Veja como service provider, middleware, controllers e services se conectam.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/pt/guides/quickstart">
+    Execute a configuração mínima para desenvolvimento local.
+  </Card>
+</CardGroup>

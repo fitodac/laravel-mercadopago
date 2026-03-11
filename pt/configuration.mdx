@@ -1,0 +1,139 @@
+---
+title: Configuração
+description: Configure credenciais, comportamento das rotas, runtime environment e resolução custom de credenciais para Laravel MercadoPago.
+---
+
+## Publicar o arquivo de configuração
+
+Publicar o arquivo é opcional:
+
+```bash
+php artisan vendor:publish --tag=mercadopago-config
+```
+
+Arquivo publicado:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Fitodac\LaravelMercadoPago\Support\EnvCredentialResolver;
+
+return [
+    'access_token' => env('MERCADOPAGO_ACCESS_TOKEN'),
+    'public_key' => env('MERCADOPAGO_PUBLIC_KEY'),
+    'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET'),
+    'route_prefix' => env('MERCADOPAGO_ROUTE_PREFIX', 'api/mercadopago'),
+    'enable_demo_routes' => (bool) env('MERCADOPAGO_ENABLE_DEMO_ROUTES', true),
+    'runtime_environment' => env('MERCADOPAGO_RUNTIME_ENVIRONMENT'),
+    'credential_resolver' => EnvCredentialResolver::class,
+];
+```
+
+## Variáveis de ambiente
+
+| Variável | Obrigatória | Default | Finalidade |
+| --- | --- | --- | --- |
+| `MERCADOPAGO_ACCESS_TOKEN` | Sim | none | Autenticação do SDK para chamadas de API |
+| `MERCADOPAGO_PUBLIC_KEY` | Não | none | Integrações frontend, como tokenização de cartões |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Recomendada | none | Validação HMAC de webhooks |
+| `MERCADOPAGO_ROUTE_PREFIX` | Não | `api/mercadopago` | Prefixo para webhook e demo routes |
+| `MERCADOPAGO_ENABLE_DEMO_ROUTES` | Não | `true` | Habilita endpoints demo em `local` e `testing` |
+| `MERCADOPAGO_RUNTIME_ENVIRONMENT` | Não | auto | Força o runtime do SDK para `local` ou `server` |
+
+## Comportamento do runtime
+
+Se `MERCADOPAGO_RUNTIME_ENVIRONMENT` estiver vazio, o pacote configura o SDK assim:
+
+- `local` quando `app()->environment()` for `local` ou `testing`
+- `server` em qualquer outro ambiente
+
+## Regras das demo routes
+
+O middleware `EnsureDemoRoutesEnabled` retorna `404` a menos que as duas condições sejam verdadeiras:
+
+- `MERCADOPAGO_ENABLE_DEMO_ROUTES=true`
+- o ambiente da aplicação seja `local` ou `testing`
+
+O endpoint de webhook ignora esse middleware e continua ativo em todos os ambientes.
+
+## Custom credential resolver
+
+Por default, o pacote usa `EnvCredentialResolver`, que lê valores da configuração do Laravel.
+
+Você pode substituí-lo pela sua própria classe:
+
+```php
+'credential_resolver' => App\Support\MercadoPago\TenantCredentialResolver::class,
+```
+
+A sua classe deve implementar:
+
+```php
+use Fitodac\LaravelMercadoPago\Contracts\CredentialResolverInterface;
+use Fitodac\LaravelMercadoPago\DTO\MercadoPagoCredentials;
+
+final class TenantCredentialResolver implements CredentialResolverInterface
+{
+    public function resolve(): MercadoPagoCredentials
+    {
+        return new MercadoPagoCredentials(
+            accessToken: 'APP_USR-token',
+            publicKey: 'APP_USR-public-key',
+            webhookSecret: 'secret',
+        );
+    }
+}
+```
+
+Use isso somente quando o seu projeto precisar resolver credenciais por tenant, store ou secret manager.
+
+## Exemplos de setup
+
+### Desenvolvimento local
+
+```ini
+APP_ENV=local
+MERCADOPAGO_ACCESS_TOKEN=TEST-your-access-token
+MERCADOPAGO_PUBLIC_KEY=TEST-your-public-key
+MERCADOPAGO_WEBHOOK_SECRET=test-secret
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+```
+
+### Produção
+
+```ini
+APP_ENV=production
+MERCADOPAGO_ACCESS_TOKEN=APP_USR-your-access-token
+MERCADOPAGO_PUBLIC_KEY=APP_USR-your-public-key
+MERCADOPAGO_WEBHOOK_SECRET=production-secret
+MERCADOPAGO_ENABLE_DEMO_ROUTES=false
+MERCADOPAGO_RUNTIME_ENVIRONMENT=server
+```
+
+## Verificar a configuração
+
+Depois de alterar o `.env`, limpe o cache de config se necessário:
+
+```bash
+php artisan config:clear
+```
+
+Depois chame:
+
+```bash
+curl http://localhost:8000/api/mercadopago/health
+```
+
+## Notas de segurança
+
+- Nunca armazene credenciais reais em arquivos versionados
+- Sempre configure `MERCADOPAGO_WEBHOOK_SECRET` em produção
+- Mantenha as demo routes desabilitadas fora de `local` e `testing`
+
+## Páginas relacionadas
+
+- [Credenciais](/pt/concepts/credentials)
+- [Deploy em produção](/pt/deployment/production)
+- [Segurança](/pt/deployment/security)

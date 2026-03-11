@@ -1,209 +1,64 @@
 ---
-title: Creando Preferencias
-description: Aprendé a generar y personalizar Preferencias de Pago en MercadoPago
-icon: file-invoice
+title: Crear preferences
+description: Construí checkout preferences de Mercado Pago con PreferenceService o con el endpoint demo.
 ---
 
-Las preferencias de pago son el pilar fundamental de la experiencia clásica de "Checkout Pro". Se encargan de dictaminar qué artículos van a cobrarse, hacia dónde va a volver el usuario una vez que el cobro finalice, y de qué forma tu sistema va a enterarse de todo esto.
+## Payload válido
 
-## Entendiendo a las Preferencias
+`CreatePreferenceRequest` acepta:
 
-Una preferencia siempre aloja:
+- `items` obligatorio
+- `payer` opcional
+- `back_urls` opcional
+- `metadata` opcional
+- `notification_url` opcional
+- `external_reference` opcional
+- `expires` opcional
+- `expiration_date_from` opcional
+- `expiration_date_to` opcional
 
-- **Items**: Los productos, impuestos o servicios canjeables.
-- **Información del Comprador (Payer)**: El correo, nombre y otra metadata opcional del cliente.
-- **URLs de Retorno (Back URLs)**: Sitios adonde rebotará el cliente tras abonar con éxito, fallo o queda en suspenso.
-- **URL de Notificación (Notification URL)**: El destino remoto donde recaerán las llamadas de sistema del Webhook POST.
-- **Referencia Externa (External reference)**: El campo para atarlo a tus pedidos de e-commerce internos (EJ: ID 551).
+## Ejemplo con service
 
-## Creación básica
-
-<CodeGroup>
-```php Mediante PreferenceService
-<?php
-
+```php
 use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-
-final class CheckoutPreferenceController
-{
-    public function store(
-        Request $request,
-        PreferenceService $preferenceService
-    ): JsonResponse {
-        $payload = $request->validate([
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.title' => ['required', 'string'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-        ]);
-
-        $preference = $preferenceService->create($payload);
-
-        return response()->json([
-            'id' => data_get($preference, 'id'),
-            'init_point' => data_get($preference, 'init_point'),
-            'sandbox_init_point' => data_get($preference, 'sandbox_init_point'),
-        ], 201);
-    }
-}
-```
-
-```bash Mediante ruta demo
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/preferences \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "items": [
-      {
-        "title": "Suscripción Premium",
-        "quantity": 1,
-        "unit_price": 99.99
-      }
-    ]
-  }'
-```
-</CodeGroup>
-
-## Estructura del Payload
-
-### Ejemplo de Payload Crecido Completo
-
-Este es un ejemplo expansivo que define prácticamente todo el abanico recurrente de variables y atributos:
-
-```json
-{
-  "items": [
-    {
-      "title": "Suscripción Premium",
-      "quantity": 1,
-      "unit_price": 99.99,
-      "currency_id": "ARS",
-      "description": "Suscripción mensual premium a la red"
-    }
-  ],
-  "payer": {
-    "email": "cliente@dominio.com",
-    "name": "Maria",
-    "surname": "Becerra",
-    "phone": {
-      "area_code": "11",
-      "number": "12345678"
-    },
-    "address": {
-      "street_name": "Libertador",
-      "street_number": 1234,
-      "zip_code": "1234"
-    }
-  },
-  "back_urls": {
-    "success": "https://mi-ecom.com/pagos/exito",
-    "pending": "https://mi-ecom.com/pagos/pendiente",
-    "failure": "https://mi-ecom.com/pagos/rechazado"
-  },
-  "notification_url": "https://mi-ecom.com/api/mercadopago/webhooks",
-  "external_reference": "ORDEN-5512",
-  "expires": true,
-  "expiration_date_from": "2026-03-10T09:00:00.000-03:00",
-  "expiration_date_to": "2026-03-15T23:59:59.000-03:00",
-  "metadata": {
-    "user_id": "98765",
-    "subscription_plan": "platinum"
-  }
-}
-```
-
-## Entendiendo a las URLs
-
-### Back URLs
-
-Se usan *estrictamente para mover al usuario de vuelta* a tu página final una vez procesen.
-
-- **success**: Tarjeta de crédito/débito o dinero en cuenta aprobado al instante.
-- **pending**: Eligieron transferir o abonar en redes de cobro en efectivo.
-- **failure**: Salieron del modal prematuramente o la tarjeta fue denegada por fondos insuficientes.
-
-<Warning>
-  Las Back URLs solo tienen peso en la Experiencia de Usuario (UI/UX). Nunca construyas la lógica de dar de alta o despachar un producto dependiendo de si el usuario cayó o no en la ruta de `/success`. ¡Usa Webhooks para eso!
-</Warning>
-
-### URLs de Notificación (Webhooks)
-
-El puerto al cual los servidores estáticos de MP atacan de forma invisible de fondo por POST para confirmar el estado final real:
-
-<Tip>
-  Tu proveedor `mercadopago.route_prefix` de Laravel MercadoPago te inyecta de por sí la ruta segura y optimizada `/api/mercadopago/webhooks`.
-</Tip>
-
-## Arquitectura de Respuestas
-
-Toda creación correcta de preferencias devuelve el siguiente diccionario armado:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": "1234567890-abc123def456",
-    "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=...",
-    "sandbox_init_point": "https://sandbox.mercadopago.com/checkout/v1/redirect?pref_id=...",
-    "date_created": "2026-03-10T10:30:00.000-03:00",
-    "items": [...],
-    "payer": {...},
-    "back_urls": {...},
-    "external_reference": "ORDER-12345"
-  },
-  "meta": []
-}
-```
-
-### Campos clave de vital importancia
-
-- **id**: Representación alfanumérica persistente de tu Preferencia (se extingue sola en su vencimiento si existiese).
-- **init_point**: El enlace donde rediriges para que operen en modalidad producción.
-- **sandbox_init_point**: Ídem al anterior pero inofensivo.
-
-## Patrones de uso diario
-
-### Ligar de manera rígida Preferencias a Órdenes
-
-```php
-$orden = Pedido::create([...]);
 
 $preference = $preferenceService->create([
-    'items' => $orden->articulos->map(fn($item) => [
-        'title' => $item->nombre,
-        'quantity' => $item->cantidad,
-        'unit_price' => $item->precio,
-    ])->toArray(),
-    'external_reference' => "ORDEN-{$orden->id}",
-    'notification_url' => route('mercadopago.webhooks.store'),
-]);
-```
-
-### Metadatos Inyectados
-
-Guardá pequeñas piezas de correlación útiles para cuando recibas la respuesta por webhook:
-
-```php
-$preference = $preferenceService->create([
-    'items' => [...],
-    'metadata' => [
-        'usuario_registrado_id' => auth()->id(),
-        'origen_de_venta' => 'aplicacion_movil_ios',
+    'items' => [
+        [
+            'title' => 'Pro plan',
+            'quantity' => 1,
+            'unit_price' => 49.90,
+        ],
     ],
+    'payer' => [
+        'email' => 'buyer@example.com',
+    ],
+    'external_reference' => 'subscription-42',
 ]);
 ```
 
-### Forzando Vencimientos de Preferencias
+## Endpoint demo
 
-Bloqueá especuladores de precios fijándoles el momento de expiración exacta:
-
-```php
-$preference = $preferenceService->create([
-    'items' => [...],
-    'expires' => true,
-    'expiration_date_from' => now()->toIso8601String(),
-    'expiration_date_to' => now()->addHours(6)->toIso8601String(), // Sólo 6 horas de chances de pagarla
-]);
+```text
+POST /api/mercadopago/preferences
 ```
+
+## Campos recomendados
+
+- `external_reference` para vincular eventos de Mercado Pago con tu order
+- `notification_url` para que Mercado Pago notifique a tu app
+- `back_urls` para que el usuario vuelva a tu aplicación después del checkout
+
+## Notas sobre la respuesta
+
+El paquete devuelve la respuesta del SDK normalizada dentro del envelope estándar. Los campos más usados suelen ser:
+
+- `id`
+- `init_point`
+- `sandbox_init_point`
+
+## Páginas relacionadas
+
+- [PreferenceService](/es/api/preference-service)
+- [Endpoint de preferences](/es/api/endpoints/preferences)
+- [Manejar webhooks](/es/guides/handling-webhooks)

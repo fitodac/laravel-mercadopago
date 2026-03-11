@@ -1,482 +1,60 @@
 ---
-title: "Managing Customers"
-description: "Create customers and manage their saved cards in MercadoPago"
-icon: "users"
+title: Managing customers
+description: Create customers, fetch customer records, and manage saved cards with Laravel MercadoPago.
 ---
 
-MercadoPago's customer management allows you to store customer information and tokenized cards for faster checkout and recurring payments.
+## Customer payload
 
-## Why use customer management
+`CreateCustomerRequest` supports:
 
-Storing customers and cards enables:
+- `email` required
+- `first_name` optional
+- `last_name` optional
+- `phone` optional
+- `identification` optional
+- `default_address` optional
+- `metadata` optional
 
-- **Faster checkout**: Customers don't re-enter card details
-- **Recurring payments**: Charge saved cards for subscriptions
-- **Better UX**: Display saved payment methods
-- **PCI compliance**: Cards are tokenized and stored by MercadoPago
+## Card payload
 
-<Note>
-  The package never stores raw card data. All card information is tokenized and
-  stored securely by MercadoPago.
-</Note>
+`StoreCustomerCardRequest` requires:
 
-## Creating customers
+- `token`
 
-<CodeGroup>
-```php Using CustomerService
-<?php
+## Service example
 
-use Fitodac\LaravelMercadoPago\Services\CustomerService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-
-final class CustomerController
-{
-public function store(
-Request $request,
-CustomerService $customerService
-): JsonResponse {
-$payload = $request->validate([
-'email' => ['required', 'email'],
-'first_name' => ['sometimes', 'string'],
-'last_name' => ['sometimes', 'string'],
-]);
-
-        $customer = $customerService->create($payload);
-
-        return response()->json($customer, 201);
-    }
-
-}
-
-````
-
-```bash Using demo endpoint
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/customers \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "email": "customer@example.com",
-    "first_name": "Ada",
-    "last_name": "Lovelace"
-  }'
-````
-
-</CodeGroup>
-
-## Customer payload structure
-
-### Minimal payload
-
-```json
-{
-  "email": "customer@example.com"
-}
-```
-
-### Complete payload
-
-```json
-{
-  "email": "customer@example.com",
-  "first_name": "Ada",
-  "last_name": "Lovelace",
-  "phone": {
-    "area_code": "11",
-    "number": "12345678"
-  },
-  "identification": {
-    "type": "DNI",
-    "number": "12345678"
-  },
-  "default_address": {
-    "street_name": "Calle Falsa",
-    "street_number": 123,
-    "zip_code": "1234"
-  },
-  "metadata": {
-    "user_id": "98765",
-    "account_type": "premium"
-  }
-}
-```
-
-## Field validation rules
-
-| Field             | Rule                | Description              |
-| ----------------- | ------------------- | ------------------------ |
-| `email`           | `required, email`   | Customer's email address |
-| `first_name`      | `sometimes, string` | First name               |
-| `last_name`       | `sometimes, string` | Last name                |
-| `phone`           | `sometimes, array`  | Phone number object      |
-| `identification`  | `sometimes, array`  | ID document              |
-| `default_address` | `sometimes, array`  | Address object           |
-| `metadata`        | `sometimes, array`  | Custom data              |
-
-<Note>
-  Validation rules are defined in `src/Http/Requests/CreateCustomerRequest.php`
-</Note>
-
-## Customer response
-
-Successful customer creation returns:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": "1234567-abc123def456",
-    "email": "customer@example.com",
-    "first_name": "Ada",
-    "last_name": "Lovelace",
-    "phone": {...},
-    "identification": {...},
-    "default_address": {...},
-    "cards": [],
-    "date_created": "2026-03-10T10:30:00.000-03:00",
-    "date_last_updated": "2026-03-10T10:30:00.000-03:00",
-    "metadata": {...}
-  },
-  "meta": []
-}
-```
-
-The `id` field is the customer identifier needed for card operations.
-
-## Retrieving customers
-
-<CodeGroup>
-```php Using CustomerService
-public function show(
-    string $customerId,
-    CustomerService $customerService
-): JsonResponse {
-    $customer = $customerService->get($customerId);
-    
-    return response()->json($customer);
-}
-```
-
-```bash Using demo endpoint
-curl http://localhost:8000/api/mercadopago/customers/1234567-abc123def456
-```
-
-</CodeGroup>
-
-## Managing customer cards
-
-### Adding cards
-
-Add a tokenized card to a customer:
-
-<CodeGroup>
-```php Using CardService
+```php
 use Fitodac\LaravelMercadoPago\Services\CardService;
-
-public function storeCard(
-string $customerId,
-Request $request,
-CardService $cardService
-): JsonResponse {
-$payload = $request->validate([
-'token' => ['required', 'string'],
-]);
-
-    $card = $cardService->create($customerId, $payload);
-
-    return response()->json($card, 201);
-
-}
-
-````
-
-```bash Using demo endpoint
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/customers/1234567-abc/cards \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "token": "CARD_TOKEN_FROM_JS_SDK"
-  }'
-````
-
-</CodeGroup>
-
-<Warning>
-  Card tokens are obtained using MercadoPago.js on the frontend. Never send raw
-  card data to your server.
-</Warning>
-
-### Card response
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": "9876543",
-    "customer_id": "1234567-abc123def456",
-    "expiration_month": 12,
-    "expiration_year": 2028,
-    "first_six_digits": "450995",
-    "last_four_digits": "3704",
-    "payment_method": {
-      "id": "visa",
-      "name": "Visa",
-      "payment_type_id": "credit_card"
-    },
-    "cardholder": {
-      "name": "ADA LOVELACE",
-      "identification": {...}
-    },
-    "date_created": "2026-03-10T10:30:00.000-03:00"
-  },
-  "meta": []
-}
-```
-
-### Deleting cards
-
-<CodeGroup>
-```php Using CardService
-public function destroyCard(
-    string $customerId,
-    string $cardId,
-    CardService $cardService
-): JsonResponse {
-    $result = $cardService->delete($customerId, $cardId);
-    
-    return response()->json($result);
-}
-```
-
-```bash Using demo endpoint
-curl --request DELETE \
-  http://localhost:8000/api/mercadopago/customers/1234567-abc/cards/9876543
-```
-
-</CodeGroup>
-
-## Common patterns
-
-### Creating customer on user registration
-
-Automatically create MercadoPago customers when users register:
-
-```php
-use App\Models\User;
 use Fitodac\LaravelMercadoPago\Services\CustomerService;
 
-class RegisterController
-{
-    public function register(
-        Request $request,
-        CustomerService $customerService
-    ) {
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
-        ]);
-
-        // Create MercadoPago customer
-        $customer = $customerService->create([
-            'email' => $user->email,
-            'first_name' => $user->first_name,
-            'last_name' => $user->last_name,
-            'metadata' => [
-                'user_id' => (string) $user->id,
-            ],
-        ]);
-
-        // Store customer ID
-        $user->update([
-            'mercadopago_customer_id' => data_get($customer, 'id'),
-        ]);
-
-        return $user;
-    }
-}
-```
-
-### Listing customer cards
-
-Retrieve customer data including saved cards:
-
-```php
-use Fitodac\LaravelMercadoPago\Services\CustomerService;
-
-Route::get('/profile/payment-methods', function (CustomerService $service) {
-    $customerId = auth()->user()->mercadopago_customer_id;
-    $customer = $service->get($customerId);
-
-    $cards = collect(data_get($customer, 'cards', []))->map(fn($card) => [
-        'id' => data_get($card, 'id'),
-        'brand' => data_get($card, 'payment_method.id'),
-        'last_four' => data_get($card, 'last_four_digits'),
-        'expiration' => sprintf(
-            '%s/%s',
-            data_get($card, 'expiration_month'),
-            data_get($card, 'expiration_year')
-        ),
-    ]);
-
-    return view('profile.payment-methods', compact('cards'));
-});
-```
-
-### Charging a saved card
-
-Process payment using a customer's saved card:
-
-```php
-use Fitodac\LaravelMercadoPago\Services\PaymentService;
-
-public function chargeCard(
-    Request $request,
-    PaymentService $paymentService
-): JsonResponse {
-    $user = auth()->user();
-
-    $payment = $paymentService->create([
-        'transaction_amount' => $request->amount,
-        'token' => $request->card_token,  // From saved card
-        'description' => 'Subscription renewal',
-        'installments' => 1,
-        'payment_method_id' => 'visa',
-        'payer' => [
-            'id' => $user->mercadopago_customer_id,
-            'email' => $user->email,
-        ],
-        'external_reference' => "SUBSCRIPTION-{$user->id}",
-    ]);
-
-    return response()->json($payment);
-}
-```
-
-### Syncing customer data
-
-Keep MercadoPago customer data in sync with your application:
-
-```php
-use App\Models\User;
-use Fitodac\LaravelMercadoPago\Services\CustomerService;
-
-class SyncCustomerDataJob
-{
-    public function handle(CustomerService $service)
-    {
-        User::whereNotNull('mercadopago_customer_id')
-            ->chunk(100, function ($users) use ($service) {
-                foreach ($users as $user) {
-                    try {
-                        $customer = $service->get($user->mercadopago_customer_id);
-
-                        // Update local cache
-                        $user->update([
-                            'mercadopago_cards_count' => count(data_get($customer, 'cards', [])),
-                            'mercadopago_synced_at' => now(),
-                        ]);
-                    } catch (\Exception $e) {
-                        \Log::warning("Failed to sync customer {$user->id}", [
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                }
-            });
-    }
-}
-```
-
-## Frontend card tokenization
-
-<Tip>
-  This package handles backend operations only. For frontend card tokenization,
-  integrate MercadoPago.js separately.
-</Tip>
-
-Basic frontend flow for saving cards:
-
-```javascript
-// 1. Initialize MercadoPago.js
-const mp = new MercadoPago("YOUR_PUBLIC_KEY");
-
-// 2. Create card token
-const cardToken = await mp.createCardToken({
-  cardNumber: "4509 9536 9623 3704",
-  cardholderName: "ADA LOVELACE",
-  cardExpirationMonth: "12",
-  cardExpirationYear: "2028",
-  securityCode: "123",
-  identificationType: "DNI",
-  identificationNumber: "12345678",
-});
-
-// 3. Send token to backend
-await fetch("/api/customers/cards", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ token: cardToken.id }),
-});
-```
-
-## Best practices
-
-### Store customer IDs locally
-
-Always store MercadoPago customer IDs in your database:
-
-```php
-Schema::table('users', function (Blueprint $table) {
-    $table->string('mercadopago_customer_id')->nullable()->unique();
-});
-```
-
-### Handle customer creation idempotently
-
-Prevent duplicate customer creation:
-
-```php
-if ($user->mercadopago_customer_id) {
-    // Customer already exists
-    return $customerService->get($user->mercadopago_customer_id);
-}
-
-// Create new customer
-$customer = $customerService->create([...]);
-```
-
-### Use metadata for linking
-
-Store your application IDs in metadata:
-
-```php
 $customer = $customerService->create([
-    'email' => $user->email,
-    'metadata' => [
-        'user_id' => (string) $user->id,
-        'account_created_at' => $user->created_at->toIso8601String(),
-    ],
+    'email' => 'buyer@example.com',
+    'first_name' => 'Jane',
+    'last_name' => 'Doe',
+]);
+
+$card = $cardService->create((string) data_get($customer, 'id'), [
+    'token' => 'card-token',
 ]);
 ```
 
-## Next steps
+## Demo endpoints
 
-<CardGroup cols={2}>
-  <Card
-    title="Processing Payments"
-    icon="credit-card"
-    href="/guides/processing-payments"
-  >
-    Process payments with saved cards
-  </Card>
-  <Card
-    title="Handling Webhooks"
-    icon="webhook"
-    href="/guides/handling-webhooks"
-  >
-    Handle payment notifications
-  </Card>
-  <Card title="Testing" icon="flask" href="/guides/testing">
-    Test with demo users and cards
-  </Card>
-</CardGroup>
+```text
+POST /api/mercadopago/customers
+GET /api/mercadopago/customers/{customerId}
+POST /api/mercadopago/customers/{customerId}/cards
+DELETE /api/mercadopago/customers/{customerId}/cards/{cardId}
+```
+
+## Use cases
+
+- save customer data before direct payments
+- attach tokenized cards for future charges
+- fetch customer state before running support or retry flows
+
+## Related pages
+
+- [CustomerService](/api/customer-service)
+- [CardService](/api/card-service)
+- [Customers endpoint](/api/endpoints/customers)

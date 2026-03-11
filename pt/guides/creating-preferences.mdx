@@ -1,0 +1,64 @@
+---
+title: Criar preferences
+description: Construa checkout preferences do Mercado Pago com PreferenceService ou com o endpoint demo.
+---
+
+## Payload válido
+
+`CreatePreferenceRequest` aceita:
+
+- `items` obrigatório
+- `payer` opcional
+- `back_urls` opcional
+- `metadata` opcional
+- `notification_url` opcional
+- `external_reference` opcional
+- `expires` opcional
+- `expiration_date_from` opcional
+- `expiration_date_to` opcional
+
+## Exemplo com service
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+
+$preference = $preferenceService->create([
+    'items' => [
+        [
+            'title' => 'Pro plan',
+            'quantity' => 1,
+            'unit_price' => 49.90,
+        ],
+    ],
+    'payer' => [
+        'email' => 'buyer@example.com',
+    ],
+    'external_reference' => 'subscription-42',
+]);
+```
+
+## Endpoint demo
+
+```text
+POST /api/mercadopago/preferences
+```
+
+## Campos recomendados
+
+- `external_reference` para vincular eventos do Mercado Pago ao seu order
+- `notification_url` para que o Mercado Pago notifique a sua app
+- `back_urls` para que o usuário volte à sua aplicação após o checkout
+
+## Notas sobre a resposta
+
+O pacote retorna a resposta do SDK normalizada dentro do envelope padrão. Os campos mais usados costumam ser:
+
+- `id`
+- `init_point`
+- `sandbox_init_point`
+
+## Páginas relacionadas
+
+- [PreferenceService](/pt/api/preference-service)
+- [Endpoint de preferences](/pt/api/endpoints/preferences)
+- [Lidar com webhooks](/pt/guides/handling-webhooks)

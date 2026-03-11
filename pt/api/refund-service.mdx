@@ -1,0 +1,30 @@
+---
+title: RefundService
+description: Referência API para full refunds e partial refunds com RefundService.
+---
+
+## Método
+
+```php
+create(string $paymentId, array $payload = []): mixed
+```
+
+## Comportamento
+
+- se `amount` existir, o pacote chama a operação de partial refund
+- se `amount` for omitido, o pacote chama a operação de full refund
+
+## Exemplos
+
+```php
+$fullRefund = $refundService->create('1234567890');
+
+$partialRefund = $refundService->create('1234567890', [
+    'amount' => 25.00,
+]);
+```
+
+## Páginas relacionadas
+
+- [Refunds](/pt/guides/refunds)
+- [Endpoint de payments](/pt/api/endpoints/payments)

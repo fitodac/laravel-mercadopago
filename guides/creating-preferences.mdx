@@ -1,297 +1,64 @@
 ---
-title: "Creating Preferences"
-description: "Learn how to create and customize MercadoPago payment preferences"
-icon: "file-invoice"
+title: Creating preferences
+description: Build Mercado Pago checkout preferences with PreferenceService or the demo endpoint.
 ---
 
-Payment preferences are the foundation of MercadoPago's checkout experience. They define what items your customer is purchasing, where to redirect them after payment, and how to notify your system.
+## Valid payload
 
-## Understanding preferences
+`CreatePreferenceRequest` accepts:
 
-A preference contains:
+- `items` required
+- `payer` optional
+- `back_urls` optional
+- `metadata` optional
+- `notification_url` optional
+- `external_reference` optional
+- `expires` optional
+- `expiration_date_from` optional
+- `expiration_date_to` optional
 
-- **Items**: Products or services being purchased
-- **Payer information**: Buyer's email and optional details
-- **URLs**: Where to redirect users after payment
-- **Notification URL**: Where MercadoPago sends webhook notifications
-- **External reference**: Your internal order/transaction ID
+## Service example
 
-## Basic preference creation
-
-<CodeGroup>
-```php Using PreferenceService
-<?php
-
+```php
 use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-
-final class CheckoutPreferenceController
-{
-public function store(
-Request $request,
-PreferenceService $preferenceService
-): JsonResponse {
-$payload = $request->validate([
-'items' => ['required', 'array', 'min:1'],
-'items._.title' => ['required', 'string'],
-'items._.quantity' => ['required', 'integer', 'min:1'],
-'items.\*.unit_price' => ['required', 'numeric', 'min:0'],
-'payer' => ['sometimes', 'array'],
-'back_urls' => ['sometimes', 'array'],
-'notification_url' => ['sometimes', 'url'],
-'external_reference' => ['sometimes', 'string'],
-]);
-
-        $preference = $preferenceService->create($payload);
-
-        return response()->json([
-            'id' => data_get($preference, 'id'),
-            'init_point' => data_get($preference, 'init_point'),
-            'sandbox_init_point' => data_get($preference, 'sandbox_init_point'),
-        ], 201);
-    }
-
-}
-
-````
-
-```bash Using demo endpoint
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/preferences \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "items": [
-      {
-        "title": "Premium Subscription",
-        "quantity": 1,
-        "unit_price": 99.99
-      }
-    ]
-  }'
-````
-
-</CodeGroup>
-
-## Payload structure
-
-### Required fields
-
-The minimum payload requires only an items array:
-
-```json
-{
-  "items": [
-    {
-      "title": "Product name",
-      "quantity": 1,
-      "unit_price": 100.5
-    }
-  ]
-}
-```
-
-### Complete payload example
-
-Here's a comprehensive example with all common options:
-
-```json
-{
-  "items": [
-    {
-      "title": "Premium Subscription",
-      "quantity": 1,
-      "unit_price": 99.99,
-      "currency_id": "ARS",
-      "description": "Monthly premium subscription"
-    }
-  ],
-  "payer": {
-    "email": "customer@example.com",
-    "name": "Ada",
-    "surname": "Lovelace",
-    "phone": {
-      "area_code": "11",
-      "number": "12345678"
-    },
-    "address": {
-      "street_name": "Calle Falsa",
-      "street_number": 123,
-      "zip_code": "1234"
-    }
-  },
-  "back_urls": {
-    "success": "https://your-app.com/payments/success",
-    "pending": "https://your-app.com/payments/pending",
-    "failure": "https://your-app.com/payments/failure"
-  },
-  "notification_url": "https://your-app.com/api/mercadopago/webhooks",
-  "external_reference": "ORDER-12345",
-  "expires": true,
-  "expiration_date_from": "2026-03-10T09:00:00.000-03:00",
-  "expiration_date_to": "2026-03-15T23:59:59.000-03:00",
-  "metadata": {
-    "user_id": "98765",
-    "subscription_plan": "premium"
-  }
-}
-```
-
-## Field validation rules
-
-The package validates preference payloads using these rules:
-
-| Field                  | Rule                       | Description                |
-| ---------------------- | -------------------------- | -------------------------- |
-| `items`                | `required, array, min:1`   | At least one item required |
-| `items.*.title`        | `required, string`         | Item name                  |
-| `items.*.quantity`     | `required, integer, min:1` | Quantity must be positive  |
-| `items.*.unit_price`   | `required, numeric, min:0` | Price cannot be negative   |
-| `payer`                | `sometimes, array`         | Optional payer information |
-| `back_urls`            | `sometimes, array`         | Optional redirect URLs     |
-| `notification_url`     | `sometimes, url`           | Must be valid URL          |
-| `external_reference`   | `sometimes, string`        | Your internal reference    |
-| `expires`              | `sometimes, boolean`       | Enable expiration          |
-| `expiration_date_from` | `sometimes, date`          | Expiration start           |
-| `expiration_date_to`   | `sometimes, date`          | Expiration end             |
-| `metadata`             | `sometimes, array`         | Custom data                |
-
-<Note>
-  Validation rules are defined in
-  `src/Http/Requests/CreatePreferenceRequest.php`
-</Note>
-
-## Understanding URLs
-
-### Back URLs
-
-These URLs define where users are redirected after payment:
-
-```json
-{
-  "back_urls": {
-    "success": "https://your-app.com/payments/success",
-    "pending": "https://your-app.com/payments/pending",
-    "failure": "https://your-app.com/payments/failure"
-  }
-}
-```
-
-- **success**: Payment approved
-- **pending**: Payment pending (e.g., bank transfer)
-- **failure**: Payment rejected or cancelled
-
-<Warning>
-  Back URLs are for user experience only. Never rely on them for payment
-  confirmation. Always use webhooks for server-side processing.
-</Warning>
-
-### Notification URL
-
-The notification URL receives webhook POST requests when payment status changes:
-
-```json
-{
-  "notification_url": "https://your-app.com/api/mercadopago/webhooks"
-}
-```
-
-<Tip>
-  The package automatically registers a webhook endpoint at
-  `/api/mercadopago/webhooks`. You can use this URL or create your own custom
-  endpoint.
-</Tip>
-
-## Response structure
-
-Successful preference creation returns:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "id": "1234567890-abc123def456",
-    "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=...",
-    "sandbox_init_point": "https://sandbox.mercadopago.com/checkout/v1/redirect?pref_id=...",
-    "date_created": "2026-03-10T10:30:00.000-03:00",
-    "items": [...],
-    "payer": {...},
-    "back_urls": {...},
-    "external_reference": "ORDER-12345"
-  },
-  "meta": []
-}
-```
-
-### Key response fields
-
-- **id**: Preference unique identifier
-- **init_point**: Production checkout URL
-- **sandbox_init_point**: Testing checkout URL
-
-## Common patterns
-
-### Linking preferences to orders
-
-Use `external_reference` to link preferences to your internal orders:
-
-```php
-$order = Order::create([...]);
 
 $preference = $preferenceService->create([
-    'items' => $order->items->map(fn($item) => [
-        'title' => $item->name,
-        'quantity' => $item->quantity,
-        'unit_price' => $item->price,
-    ])->toArray(),
-    'external_reference' => "ORDER-{$order->id}",
-    'notification_url' => route('mercadopago.webhooks.store'),
-]);
-```
-
-### Adding metadata
-
-Store custom data for webhook processing:
-
-```php
-$preference = $preferenceService->create([
-    'items' => [...],
-    'metadata' => [
-        'user_id' => auth()->id(),
-        'subscription_plan' => 'premium',
-        'source' => 'web',
+    'items' => [
+        [
+            'title' => 'Pro plan',
+            'quantity' => 1,
+            'unit_price' => 49.90,
+        ],
     ],
+    'payer' => [
+        'email' => 'buyer@example.com',
+    ],
+    'external_reference' => 'subscription-42',
 ]);
 ```
 
-### Setting expiration
+## Demo endpoint
 
-Create time-limited payment preferences:
-
-```php
-$preference = $preferenceService->create([
-    'items' => [...],
-    'expires' => true,
-    'expiration_date_from' => now()->toIso8601String(),
-    'expiration_date_to' => now()->addHours(24)->toIso8601String(),
-]);
+```text
+POST /api/mercadopago/preferences
 ```
 
-## Next steps
+## Recommended fields
 
-<CardGroup cols={2}>
-  <Card
-    title="Processing Payments"
-    icon="credit-card"
-    href="/guides/processing-payments"
-  >
-    Learn about direct payment processing
-  </Card>
-  <Card
-    title="Handling Webhooks"
-    icon="webhook"
-    href="/guides/handling-webhooks"
-  >
-    Process payment notifications
-  </Card>
-</CardGroup>
+- `external_reference` so you can match Mercado Pago events back to your order
+- `notification_url` so Mercado Pago can notify your app
+- `back_urls` so the user can return to your application after checkout
+
+## Response notes
+
+The package returns the SDK response normalized inside the standard envelope. The most common fields you will use are:
+
+- `id`
+- `init_point`
+- `sandbox_init_point`
+
+## Related pages
+
+- [PreferenceService](/api/preference-service)
+- [Preferences endpoint](/api/endpoints/preferences)
+- [Handling webhooks](/guides/handling-webhooks)

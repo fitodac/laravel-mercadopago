@@ -1,0 +1,43 @@
+---
+title: PaymentService
+description: Referência API para criar e consultar payments com PaymentService.
+---
+
+## Métodos
+
+```php
+create(array $payload): mixed
+get(string $paymentId): mixed
+```
+
+## Campos obrigatórios para create
+
+- `transaction_amount`
+- `token`
+- `description`
+- `installments`
+- `payment_method_id`
+- `payer.email`
+
+## Exemplo
+
+```php
+$payment = $paymentService->create([
+    'transaction_amount' => 150.75,
+    'token' => 'card-token',
+    'description' => 'Order #1001',
+    'installments' => 1,
+    'payment_method_id' => 'visa',
+    'payer' => [
+        'email' => 'buyer@example.com',
+    ],
+]);
+
+$samePayment = $paymentService->get('1234567890');
+```
+
+## Páginas relacionadas
+
+- [Processar payments](/pt/guides/processing-payments)
+- [Endpoint de payments](/pt/api/endpoints/payments)
+- [RefundService](/pt/api/refund-service)

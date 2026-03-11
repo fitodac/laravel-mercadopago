@@ -1,138 +1,53 @@
 ---
-title: "Devoluciones (Refunds)"
-description: "Procesá reintegros totales o fraccionados sobre pagos con éxito en MercadoPago."
-icon: "rotate-left"
+title: Refunds
+description: Procesá full refunds o partial refunds con RefundService y con el endpoint de refund de payments.
 ---
 
-El paquete oficialista provee una vía limpia y ágil de anular y devolver los pagos que ya cruzaron la barrera de tu frontend y fueron sellados como exitosos (`approved`).
+## Comportamiento del refund
 
-## Conceptos a Interiorizar
+`RefundService` soporta dos modos:
 
-Puntos de severidad respecto a cómo piensa el sistema sobre tus transacciones:
+- full refund cuando omitís `amount`
+- partial refund cuando enviás `amount`
 
-- **Estrictamente** los pagos que figuran como `approved` admiten un reintegro.
-- Está permitido dividir la transacción y devolver plata de manera parcial (fraccionada).
-- El Gateway acciona tu pedido al milisegundo, pero el saldo no va a impactar en la tarjeta del cliente o resumen hasta pasados unos días hábiles dependiendo de su banco emisor (3 a 30 días).
-- Todo ticket de devolución genera un ID autoincremental contable único.
+## Full refund
 
-<Warning>
-  El proceso es destructivo y unidireccional. Mercado Pago **jamás** te dejará deshacer ni cobrarle de nuevo automáticamente a una persona a la que acabas de ejecutarle un Refund a su tarjeta.
-</Warning>
-
-## Reintegro Íntegro y Total
-
-Restituir a tope el dinero descontado:
-
-<CodeGroup>
-```php Mediante inyección RefundService
-<?php
-
-use Fitodac\LaravelMercadoPago\Services\RefundService;
-
-final class GeneradorReembolsos
-{
-    public function deshacerCompraDeBolsa(string $paymentId, RefundService $refund): JsonResponse 
-    {
-        // Cancelación absoluta - solo le damos un payload vacio
-        $ticketReintegro = $refund->create($paymentId);
-
-        return response()->json($ticketReintegro, 201);
-    }
-}
+```php
+$refund = $refundService->create($paymentId);
 ```
 
-```bash Mediante URL demo
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/payments/12345/refunds \
-  --header 'Content-Type: application/json' \
-  --data '{}'
-```
-</CodeGroup>
+## Partial refund
 
-## Devoluciones Fraccionadas
-
-Ideal para cuando el cliente retuvo una prenda pero pidió el dinero de vuelta únicamente del calzado dentro del mismo resumen.
-
-<CodeGroup>
-```php RefundService en Parcialidad
-public function devolucionFraccionada(string $paymentId, Request $request, RefundService $r): JsonResponse 
-{
-    $dinero = $request->validate([
-        'amount' => ['required', 'numeric', 'min:0.01'],
-    ]);
-
-    $ticket = $r->create($paymentId, $dinero);
-
-    return response()->json($ticket, 201);
-}
+```php
+$refund = $refundService->create($paymentId, [
+    'amount' => 25.00,
+]);
 ```
 
-```bash Demo
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/payments/1234567/refunds \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "amount": 50.00
-  }'
+## Endpoint demo
+
+```text
+POST /api/mercadopago/payments/{paymentId}/refunds
 ```
-</CodeGroup>
 
-## Estructura generada como comprobante
-
-La orden correctamente aprobada emitirá esto hacia Laravel:
+Payload:
 
 ```json
 {
-  "ok": true,
-  "data": {
-    "id": 987654321,
-    "payment_id": 123456789,
-    "amount": 50.0,
-    "status": "approved",
-    "source": {
-      "type": "collector"
-    },
-    "date_created": "2026-03-10T14:30:00.000-03:00",
-    "unique_sequence_number": null,
-    "refund_mode": "standard"
-  },
-  "meta": []
+  "amount": 25.00
 }
 ```
 
-## Arquitectura de Validaciones recomendadas
+## Validaciones de negocio recomendadas
 
-### Tope máximo de Devolución
+Antes de llamar a `RefundService`, verificá en tu app:
 
-No podés intentar devolver más plata fraccionadamente de lo que valió el ticket entero.
+- que la order pertenezca a la cuenta correcta
+- que el payment sea elegible para refund
+- que el monto no supere el saldo reembolsable
 
-```php
-public function procesarMitad(string $pId, Request $req, PaymentService $mp, RefundService $r): JsonResponse 
-{
-    $factura = $mp->get($pId);
+## Páginas relacionadas
 
-    if ($req->amount > $factura['transaction_amount']) {
-        return response()->json([
-            'error' => 'Aritmética inválida, pretendés devolver más de lo que entró',
-            'maximo' => $factura['transaction_amount'],
-        ], 422);
-    }
-
-    return response()->json($r->create($pId, ['amount' => $req->amount]));
-}
-```
-
-### Anulaciones disparadas automáticamente (Eventos de Cancelación de Pedidos)
-
-Cuando tu empleado o operario decida cancelar manual, conectá ese gatillo de Eloquent y pedile el refund interconectando a Mercado Pago por atrás:
-
-```php
-public function eliminarPedidoParaSiempre(Order $pedido)
-{
-    if ($pedido->status === 'pagado' && $pedido->mp_payment_id) {
-        $this->motorReintegro->create($pedido->mp_payment_id);
-    }
-    
-    $pedido->update(['status' => 'anulado_devuelto']);
-}
-```
+- [RefundService](/es/api/refund-service)
+- [Endpoint de payments](/es/api/endpoints/payments)
+- [Procesar payments](/es/guides/processing-payments)

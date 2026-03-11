@@ -1,106 +1,42 @@
 ---
-title: "CustomerService"
-description: "Servicio para forjar y enlazar Perfiles Remotos a Usuarios Locales."
-icon: "users"
+title: CustomerService
+description: Referencia API para crear y consultar customers de Mercado Pago.
 ---
-
-## Resumen
-
-El objeto `CustomerService` abstrae el puente hacia MP y te permite crear y/o descargar a tus legajos los datos sincronizados de un "cliente duradero". Estos perfiles son los únicos que Mercado Pago autoriza para poder amarrarle indefinidamente múltiples y variables tarjetas de crédito y débito post-tokenización.
 
 ## Métodos
 
-### create()
+```php
+create(array $payload): mixed
+get(string $customerId): mixed
+```
 
-Inventa y empuja un nuevo Customer y abre un id público.
+## Campo obligatorio para create
+
+- `email`
+
+Opcionales:
+
+- `first_name`
+- `last_name`
+- `phone`
+- `identification`
+- `default_address`
+- `metadata`
+
+## Ejemplo
 
 ```php
-public function create(array $payload): mixed
+$customer = $customerService->create([
+    'email' => 'buyer@example.com',
+    'first_name' => 'Jane',
+    'last_name' => 'Doe',
+]);
+
+$sameCustomer = $customerService->get((string) data_get($customer, 'id'));
 ```
 
-#### Parámetros
+## Páginas relacionadas
 
-<ParamField path="payload" type="array" required>
-  Data simple descriptiva:
-  <Expandable title="Estructura del Payload (Soporta data precaria)">
-    <ParamField path="email" type="string" required>
-      El pilar central de los Customer es el email con el cual tu Laravel se casa con MP.
-    </ParamField>
-
-    <ParamField path="first_name" type="string">
-      Nombres libres.
-    </ParamField>
-
-    <ParamField path="last_name" type="string">
-      Apellidos.
-    </ParamField>
-
-    <ParamField path="identification" type="array">
-      Los ID documentales (DNI, CUIT, CPF).
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-#### Retornos
-
-<ResponseField name="response" type="mixed">
-  Diccionario base con tu id.
-  <Expandable title="Respuesta y Esclavo UUID">
-    <ResponseField name="id" type="string">
-      Alfanúmerico extenso que debes copiar y pegar obligatoriamente a una columna en tu propia base de datos (Ej: Tabla Users, Columna `mercadopago_customer_id`).
-    </ResponseField>
-
-    <ResponseField name="date_created" type="string">
-      Timestamp original del alta en MP ISO 8601.
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-#### Rutinas Normales
-
-<CodeGroup>
-```php Inyección y Auto-Salvado.
-use Fitodac\LaravelMercadoPago\Services\CustomerService;
-
-public function registrarYPegarEnMp(Request $req, CustomerService $service) 
-{
-    // Creás cliente local MySQL ... etc
-    $usuario = User::create([...]);
-
-    // Acto seguido empujás y armás copia en Mercado Pago
-    $customerRemoto = $service->create([
-        'email' => $usuario->email,
-        'first_name' => $usuario->name,
-    ]);
-
-    // Pegamento Final de Relaciones
-    $usuario->update([
-        'mp_customer_id' => data_get($customerRemoto, 'id'),
-    ]);
-
-    return "Usuario Creado y Syncronizado PCI";
-}
-```
-</CodeGroup>
-
-### get()
-
-Extrayendo de vuelta y resincronizando en base a la columna esclava local de nuestro proyecto.
-
-```php
-public function get(string $customerId): mixed
-```
-
-#### Invocando a resincronización
-
-<CodeGroup>
-```php Checkeando viabilidad (Existencia de perfil perenne)
-use Fitodac\LaravelMercadoPago\Services\CustomerService;
-
-$idBaseDeDatosLocal = auth()->user()->mp_customer_id;
-
-$customerGiganteDropeado = app(CustomerService::class)->get($idBaseDeDatosLocal);
-
-$correolocal = data_get($customerGiganteDropeado, 'email');
-```
-</CodeGroup>
+- [Gestionar customers](/es/guides/managing-customers)
+- [Endpoint de customers](/es/api/endpoints/customers)
+- [CardService](/es/api/card-service)

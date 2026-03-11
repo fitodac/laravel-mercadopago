@@ -1,77 +1,25 @@
 ---
-title: "PaymentMethodService"
-description: "Servicio para barrer las grillas de marcas y logos de Bancos/Tarjetas habilitadas en vivo."
-icon: "list"
+title: PaymentMethodService
+description: Referencia API para listar payment methods disponibles de Mercado Pago.
 ---
 
-## Resumen Operativo
-
-El `PaymentMethodService` efectúa un escaneo o barrido directo conectándose a los enclaves de tu propia cuenta productora de Mercado Pago para devolverte exactamente qué marcas, logos y convenios tenés actualmente aceptados para mostrarle al usuario en el Frontend de Laravel.
-
-<Info>
-  Las listas mutan por cuenta o país. En Argentina tendrás Naranja y Cabal, en Brasil mutará y figurarán otros plásticos. Todo es manejado orgánicamente.
-</Info>
-
-## Obtención `all()`
-
-El barredor general que extrae el diccionario enciclopédico para iterar.
+## Método
 
 ```php
-public function all(): mixed
+all(): mixed
 ```
 
-### El Gigante Volúmen de Datos de Respuesta
-
-<ResponseField name="response" type="mixed">
-  Array de "medios de pago" gigantes en donde cada sub-hijo contiene:
-  <Expandable title="Campos más usados (UI/UX)">
-    <ResponseField name="id" type="string">
-      Identificador de string corta vital para inyectar en Formularios (`visa`, `master`, `amex`, `debmaster`).
-    </ResponseField>
-
-    <ResponseField name="name" type="string">
-      Label amigable a la vista humana (`Mastercard Débito`).
-    </ResponseField>
-
-    <ResponseField name="payment_type_id" type="string">
-      Para agruparlos en tu Frontend visual (`credit_card`, `debit_card`, `ticket` para billetes físicos).
-    </ResponseField>
-
-    <ResponseField name="secure_thumbnail" type="string">
-      Ruta a la CDN global en HTTPS en donde te proveen la famosa banderita/dibujito logo del banco transparente prefabricada.
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
-### Usos y Desacople Inteligente
-
-Si queremos mostrar un selector de tarjetas de crédito bellísimo armado desde el BackEnd sin recurrir a JS y SDK frontales:
+## Ejemplo
 
 ```php
-use Fitodac\LaravelMercadoPago\Services\PaymentMethodService;
-
-public function getOpcionesFiltradasBellas()
-{
-    $crudas = app(PaymentMethodService::class)->all();
-
-    // Pulimos usando Collection nativa de Laravel
-    $creditosPuros = collect($crudas)
-        ->filter(fn($m) => data_get($m, 'status') === 'active') // Quitadas las de baja por MP
-        ->filter(fn($m) => data_get($m, 'payment_type_id') === 'credit_card') // Excluimos débitos
-        ->map(fn($method) => [
-            // Exportamos DTO ultra fino a nuestras Vistas Blade
-            'identificadorBackend' => data_get($method, 'id'),
-            'nomenclatura' => data_get($method, 'name'),
-            'ico' => data_get($method, 'secure_thumbnail'),
-        ])
-        ->values();
-
-    return view('checkout.paso2', [
-        'tarjetas' => $creditosPuros,
-    ]);
-}
+$paymentMethods = $paymentMethodService->all();
 ```
 
-<Warning>
-  Golpear a Mercado Pago por cada F5 o Render de tu página para traer la lista es aberrante a niveles lógicos y de RPS. Envolvé siempre la rutina adentro de un `Cache::remember()` que expire cada 24 horas usando Redis o Memcached.
-</Warning>
+## Notas
+
+Este service es solo de lectura. Sirve para formularios frontend de pago y para validar qué métodos están disponibles en el contexto de tu cuenta de Mercado Pago.
+
+## Páginas relacionadas
+
+- [Endpoint de payment methods](/es/api/endpoints/payment-methods)
+- [Testing](/es/guides/testing)

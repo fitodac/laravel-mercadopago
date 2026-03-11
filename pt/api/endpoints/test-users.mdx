@@ -1,0 +1,27 @@
+---
+title: Endpoint de test users
+description: Referência do endpoint demo para criar test users do Mercado Pago.
+---
+
+## Disponibilidade
+
+Este endpoint só responde quando as demo routes estão habilitadas e o ambiente da app é `local` ou `testing`.
+
+## Rota
+
+```text
+POST /api/mercadopago/test-users
+```
+
+## Payload obrigatório
+
+- `site_id` deve ser um de `MLA`, `MLB`, `MLC`, `MLM`, `MLU`, `MCO`, `MPE`
+
+Opcional:
+
+- `description`
+
+## Páginas relacionadas
+
+- [TestUserService](/pt/api/test-user-service)
+- [Testing](/pt/guides/testing)

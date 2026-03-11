@@ -1,0 +1,81 @@
+---
+title: Services
+description: Entenda a camada reutilizável de services do Laravel MercadoPago e quando vale injetar services em vez de usar endpoints demo.
+---
+
+## Por que a camada de services importa
+
+O pacote foi pensado para que a sua aplicação consuma o Mercado Pago por meio de services injetados, sem acoplar a lógica de negócio a controllers demo ou a detalhes internos do SDK.
+
+## Métodos disponíveis
+
+| Service | Métodos públicos |
+| --- | --- |
+| `PreferenceService` | `create(array $payload)` |
+| `PaymentService` | `create(array $payload)`, `get(string $paymentId)` |
+| `RefundService` | `create(string $paymentId, array $payload = [])` |
+| `CustomerService` | `create(array $payload)`, `get(string $customerId)` |
+| `CardService` | `create(string $customerId, array $payload)`, `delete(string $customerId, string $cardId)` |
+| `PaymentMethodService` | `all()` |
+| `WebhookService` | `handle(Request $request)` |
+| `TestUserService` | `create(array $payload)` |
+
+## Injetando um service
+
+Use os services diretamente no seu próprio controller:
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PreferenceService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+final class CheckoutController
+{
+    public function store(
+        Request $request,
+        PreferenceService $preferenceService,
+    ): JsonResponse {
+        $payload = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.title' => ['required', 'string'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $preference = $preferenceService->create($payload);
+
+        return response()->json([
+            'id' => data_get($preference, 'id'),
+            'init_point' => data_get($preference, 'init_point'),
+        ], 201);
+    }
+}
+```
+
+## Quando usar services e quando usar endpoints demo
+
+Use services quando:
+
+- você estiver construindo fluxos de produção
+- precisar do seu próprio auth ou rate limiting
+- quiser persistir orders ou payments
+- precisar de validação ou regras de negócio próprias
+
+Use endpoints demo quando:
+
+- estiver testando a ligação do pacote localmente
+- precisar de smoke tests rápidos de conectividade com o SDK
+- quiser exemplos simples de integração
+
+## Detalhes de comportamento
+
+- `RefundService::create()` chama `refund()` quando existe `amount` e `refundTotal()` quando não existe
+- `CardService` usa o customer card client e só suporta criação e remoção de cards
+- `TestUserService` usa `SdkHttpClient` porque test user creation não é exposta pelo mesmo cliente high-level
+- `WebhookService` valida assinaturas somente quando existem `MERCADOPAGO_WEBHOOK_SECRET` e `x-signature`
+
+## Páginas relacionadas
+
+- [Quickstart](/pt/guides/quickstart)
+- [PaymentService](/pt/api/payment-service)
+- [WebhookService](/pt/api/webhook-service)

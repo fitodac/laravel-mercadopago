@@ -1,72 +1,30 @@
 ---
-title: "RefundService"
-description: "Servicio para procesar restituciones y devoluciones de dinero avaladas."
-icon: "rotate-left"
+title: RefundService
+description: Referencia API para full refunds y partial refunds con RefundService.
 ---
 
-## Resumen
-
-La clase `RefundService` maneja todo el circuito contable de devolver dinero a un cliente después de que su pago ingresó al sistema bajo la bandera de status `approved`. El dinero viaja de vuelta directo al saldo, homebanking o tarjeta sin trabas.
-
-<Note>
-  Las reglas de negocio de Mercado Pago estipulan que solamente las entidades selladas como `approved` aceptan anulaciones con reintegro financiero.
-</Note>
-
-## Métodos
-
-### create()
-
-El comando de gracia que acciona el gatillo hacia los servidores bursátiles de MP.
+## Método
 
 ```php
-public function create(string $paymentId, array $payload = []): mixed
+create(string $paymentId, array $payload = []): mixed
 ```
 
-#### Parámetros Inyectados
+## Comportamiento
 
-<ParamField path="paymentId" type="string" required>
-  El ID gigante numérico del cobro que te arrojó el Webhook u obtuviste del Frontend.
-</ParamField>
+- si existe `amount`, el paquete llama a la operación de partial refund
+- si omitís `amount`, el paquete llama a la operación de full refund
 
-<ParamField path="payload" type="array" default="[]">
-  Si querés devolver sólo la mitad u otra porción la envías acá; caso contrario envíalo vacío para devolverle el %100 de la compra.
-  <Expandable title="Estructura para Parcialidades">
-    <ParamField path="amount" type="numeric">
-      Obligatorio poner la plata deseada si quieres una devolución fraccionada.
-    </ParamField>
-  </Expandable>
-</ParamField>
+## Ejemplos
 
-#### Retornos
-<ResponseField name="response" type="mixed">
-  Objeto completo proveniente desde las entrañas de MP que indica el status y fecha del Reembolso originado (Ojo: tiene un ID propio paralelo al pago original).
-</ResponseField>
+```php
+$fullRefund = $refundService->create('1234567890');
 
-#### Utilización en la Cotidianeidad
-
-<CodeGroup>
-```php Reintegro Absoluto
-use Fitodac\LaravelMercadoPago\Services\RefundService;
-
-$ticketTotal = app(RefundService::class)->create('123456789');
-
-// Extracciones de datos útiles
-$idDelTicketVuelto = data_get($ticketTotal, 'id');
-$plataRevocada = data_get($ticketTotal, 'amount');
-```
-
-```php Reintegro Dividido (Fraccionado)
-use Fitodac\LaravelMercadoPago\Services\RefundService;
-
-$ticketParcial = app(RefundService::class)->create('123456789', [
-    'amount' => 5000.00, // Sólo le damos 5000 pesos/reales.
+$partialRefund = $refundService->create('1234567890', [
+    'amount' => 25.00,
 ]);
 ```
-</CodeGroup>
 
-## Caídas (Exceptions)
-<ResponseField name="MercadoPagoException" type="exception">
-  Se dispararán en general por dos topes de muros arquitectónicos de Mercado Pago: 
-  - Intentar extorsivamente devolver más plata fraccionada de la que entró a favor.
-  - Vencimiento del límite de gracia legal (Pasaron 180 días en Tarjetas o > 90 días en efectividades).
-</ResponseField>
+## Páginas relacionadas
+
+- [Refunds](/es/guides/refunds)
+- [Endpoint de payments](/es/api/endpoints/payments)

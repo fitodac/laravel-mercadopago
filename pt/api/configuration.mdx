@@ -1,0 +1,36 @@
+---
+title: Configuração da API
+description: Referência para as chaves de configuração do pacote e os nomes de rotas expostos pelo Laravel MercadoPago.
+---
+
+## Chaves de config
+
+| Key | Type | Default |
+| --- | --- | --- |
+| `mercadopago.access_token` | `string|null` | `null` |
+| `mercadopago.public_key` | `string|null` | `null` |
+| `mercadopago.webhook_secret` | `string|null` | `null` |
+| `mercadopago.route_prefix` | `string` | `api/mercadopago` |
+| `mercadopago.enable_demo_routes` | `bool` | `true` |
+| `mercadopago.runtime_environment` | `string|null` | `null` |
+| `mercadopago.credential_resolver` | `class-string` | `EnvCredentialResolver::class` |
+
+## Nomes de rotas registradas
+
+- `mercadopago.webhooks.store`
+- `mercadopago.health`
+- `mercadopago.payment-methods.index`
+- `mercadopago.preferences.store`
+- `mercadopago.payments.store`
+- `mercadopago.payments.show`
+- `mercadopago.payments.refund`
+- `mercadopago.customers.store`
+- `mercadopago.customers.show`
+- `mercadopago.customers.cards.store`
+- `mercadopago.customers.cards.destroy`
+- `mercadopago.test-users.store`
+
+## Páginas relacionadas
+
+- [Configuração](/pt/configuration)
+- [Arquitetura](/pt/concepts/architecture)

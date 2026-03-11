@@ -1,0 +1,49 @@
+---
+title: Endpoint de preferences
+description: Referência do endpoint demo para criar checkout preferences.
+---
+
+## Disponibilidade
+
+Este endpoint só responde quando as demo routes estão habilitadas e o ambiente da app é `local` ou `testing`.
+
+## Rota
+
+```text
+POST /api/mercadopago/preferences
+```
+
+## Campos obrigatórios
+
+- `items[].title`
+- `items[].quantity`
+- `items[].unit_price`
+
+## Campos opcionais
+
+- `payer`
+- `back_urls`
+- `metadata`
+- `notification_url`
+- `external_reference`
+- `expires`
+- `expiration_date_from`
+- `expiration_date_to`
+
+## Resposta de sucesso
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "1234567890",
+    "init_point": "https://www.mercadopago.com/checkout/v1/redirect?pref_id=..."
+  },
+  "meta": []
+}
+```
+
+## Páginas relacionadas
+
+- [PreferenceService](/pt/api/preference-service)
+- [Criar preferences](/pt/guides/creating-preferences)

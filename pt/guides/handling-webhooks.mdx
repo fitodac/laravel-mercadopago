@@ -1,0 +1,60 @@
+---
+title: Lidar com webhooks
+description: Receba notificações do Mercado Pago com segurança e conecte-as ao estado da sua aplicação.
+---
+
+## Endpoint sempre ativo
+
+O pacote sempre expõe:
+
+```text
+POST /api/mercadopago/webhooks
+```
+
+Essa rota não depende da configuração das demo routes.
+
+## O que o pacote faz
+
+`WebhookService`:
+
+- lê o payload da request
+- valida `x-signature` quando existe um secret configurado
+- retorna `acknowledged`, `validated`, `topic`, `resource` e `payload`
+
+## O que ainda é responsabilidade da sua app
+
+O pacote não persiste eventos de webhook nem atualiza os seus registros de negócio.
+
+Fluxo típico da app:
+
+1. receber o webhook
+2. confirmar o resource id e o topic
+3. buscar ou reconciliar o payment/order relacionado na sua app
+4. atualizar o estado de negócio de forma idempotente
+
+## Exemplo de teste local
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/mercadopago/webhooks \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "type": "payment",
+    "data": {
+      "id": "1234567890"
+    }
+  }'
+```
+
+## Recomendações para produção
+
+- configure `MERCADOPAGO_WEBHOOK_SECRET`
+- exponha o endpoint por HTTPS
+- trate o processamento do webhook como idempotente
+- verifique a propriedade de negócio antes de marcar orders como pagas
+
+## Páginas relacionadas
+
+- [Endpoint de webhook](/pt/api/endpoints/webhooks)
+- [WebhookService](/pt/api/webhook-service)
+- [Segurança](/pt/deployment/security)

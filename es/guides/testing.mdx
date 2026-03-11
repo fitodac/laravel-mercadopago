@@ -1,18 +1,34 @@
 ---
-title: "Testing y Calidad Continua"
-description: "Audita la integración desde lo micro hasta lo macro implementando tests automatizados en entornos Sandbox de Laravel MercadoPago."
-icon: "flask"
+title: Testing
+description: Probá Laravel MercadoPago en local con demo endpoints, health checks y test users.
 ---
 
-El ecosistema integra de forma limpia y transparente las utilidades de Sandbox de Mercado Pago, y en conjunto con los comandos y rutas generadas bajo bandera local/test te ayudarán a auditar tu QA.
+## Habilitar demo routes
 
-## Los Entornos Paralelos de Sandbox Limitadas (Test Users)
+Usá:
 
-No debés jamás testear mediante Tarjetas pre-pagadas tuyas, correos personales o familiares o tarjetas prestadas corporativas; El Machine Learning anti-fraude cancelará indefinidamente o bloqueará a los perfiles que usen los ecosistemas simulados de la API de producción en tu localhost.
+```ini
+APP_ENV=local
+MERCADOPAGO_ENABLE_DEMO_ROUTES=true
+```
 
-Para sortear eso, la API nos permite engendrar `TestUsers` provisorios.
+## Demo endpoints disponibles para pruebas
 
-### Generando Sub-Billeteras en masa
+| Método | Ruta |
+| --- | --- |
+| `GET` | `/api/mercadopago/health` |
+| `GET` | `/api/mercadopago/payment-methods` |
+| `POST` | `/api/mercadopago/preferences` |
+| `POST` | `/api/mercadopago/payments` |
+| `GET` | `/api/mercadopago/payments/{paymentId}` |
+| `POST` | `/api/mercadopago/payments/{paymentId}/refunds` |
+| `POST` | `/api/mercadopago/customers` |
+| `GET` | `/api/mercadopago/customers/{customerId}` |
+| `POST` | `/api/mercadopago/customers/{customerId}/cards` |
+| `DELETE` | `/api/mercadopago/customers/{customerId}/cards/{cardId}` |
+| `POST` | `/api/mercadopago/test-users` |
+
+## Crear un test user
 
 ```bash
 curl --request POST \
@@ -20,68 +36,26 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --data '{
     "site_id": "MLA",
-    "description": "Comprador Ficticio de Testing Integral Numb-1"
+    "description": "Local QA user"
   }'
 ```
 
-*MLA hace alusión a Mercado Libre Argentina, MLB Brasil, etc.*
+## Secuencia práctica de prueba
 
-**Outputs Creado (Respuesta)**
-```json
-{
-  "ok": true,
-  "data": {
-    "id": 123456789,
-    "nickname": "TESTUSER123456",
-    "password": "qatest1234",
-    "site_status": "active",
-    "email": "test_user_123456@testuser.com"
-  },
-  "meta": []
-}
-```
+1. llamar a `/health`
+2. listar payment methods
+3. crear una preference
+4. crear o consultar un customer
+5. probar la recepción de webhooks
 
-Tomá cuenta inminente del correo provisto `email` para insertarlos en payloads para creaciones de preferncias y usalos contra la API con la tranquilidad de que nunca serán auditados penalmente ni generarán balances financieros válidos que afecten la liquidez del panel de control de Producción.
+## Notas
 
-## Mockups Interinos de Backend (PHPUnit / Pest)
+- los demo endpoints son solo para `local` y `testing`
+- la ruta de webhook puede probarse en cualquier entorno
+- probar direct card payments sigue requiriendo flujos válidos de tokenización frontend
 
-Escribir Tests sobre APIS HTTP de un tercero siempre trae aparejado el problema de la lentitud de respuesta. El framework permite apaciguar esos falsos positivos mockeando al SDK provisto `LaravelMercadoPago\Services`:
+## Páginas relacionadas
 
-```php
-use Fitodac\LaravelMercadoPago\Services\PaymentService;
-
-public function test_mi_controlador_recibe_aprobacion_integral_desde_mp()
-{
-    // Simulamos inyección limpia en Service Container.
-    $this->mock(PaymentService::class, function ($mocker) {
-        $mocker->shouldReceive('create')
-            ->once()
-            ->andReturn([
-                'id' => 1930129331,
-                'status' => 'approved',
-                'status_detail' => 'accredited',
-            ]);
-    });
-
-    $testRoute = $this->postJson('/admin/pagar-plan-plus', [
-        'amount' => 100,
-        'card_token' => 'CARD_TOKEN',
-    ]);
-
-    $testRoute->assertStatus(201)
-        ->assertJsonFragment(['status' => 'approved']);
-}
-```
-
-## Cartones de Pruebas "AntiFraudes"
-
-Mercado Pago ofrece matrices de números de tarjetas que superan la barrera del "Luhn Check" y del primer portón API, y caen pre-configuradamente en diversos perfiles y status esperados forzosamente para chequear refracciones del Frontend.
-
-**Lista de comprobaciones clásicas de Master / Visa**:
-
-| Red (Method) | Numeración de Prueba Ficticia | Resultado API predecible       |
-| ------------ | ----------------------------- | ------------------ |
-| VISA/MASTER  | *Miranos en la docu oficial de MercadoPago (Dev)*| `approved` - Status regular.        |
-| VISA/MASTER  | 5031 / 4012 (Distintas Redes) | `cc_rejected_bad_filled_security_code` / `insufficient_amount`       |
-
-*Te exhortamos a mantener a salvo de este modo tu ambiente de `APP_ENV=local|testing` al momento de iterar lógicas destructivas en las ramas.*
+- [Inicio rápido](/es/guides/quickstart)
+- [TestUserService](/es/api/test-user-service)
+- [Endpoint de test users](/es/api/endpoints/test-users)

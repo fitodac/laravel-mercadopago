@@ -29,7 +29,7 @@
             "tab": "Documentation",
             "groups": [
               {
-                "group": "Get Started",
+                "group": "Get started",
                 "pages": [
                   "introduction",
                   "installation",
@@ -37,7 +37,7 @@
                 ]
               },
               {
-                "group": "Core Concepts",
+                "group": "Core concepts",
                 "pages": [
                   "concepts/architecture",
                   "concepts/services",
@@ -73,7 +73,7 @@
             ]
           },
           {
-            "tab": "API Reference",
+            "tab": "API reference",
             "groups": [
               {
                 "group": "Services",
@@ -89,7 +89,7 @@
                 ]
               },
               {
-                "group": "Demo Endpoints",
+                "group": "Demo endpoints",
                 "pages": [
                   "api/endpoints/preferences",
                   "api/endpoints/payments",
@@ -117,7 +117,7 @@
             "tab": "Documentación",
             "groups": [
               {
-                "group": "Comenzar",
+                "group": "Primeros pasos",
                 "pages": [
                   "es/introduction",
                   "es/installation",
@@ -125,7 +125,7 @@
                 ]
               },
               {
-                "group": "Conceptos Clave",
+                "group": "Conceptos clave",
                 "pages": [
                   "es/concepts/architecture",
                   "es/concepts/services",
@@ -177,7 +177,7 @@
                 ]
               },
               {
-                "group": "Endpoints Demo",
+                "group": "Endpoints demo",
                 "pages": [
                   "es/api/endpoints/preferences",
                   "es/api/endpoints/payments",
@@ -191,6 +191,94 @@
                 "group": "Configuración",
                 "pages": [
                   "es/api/configuration"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "language": "pt-BR",
+        "name": "Português (Brasil)",
+        "tabs": [
+          {
+            "tab": "Documentação",
+            "groups": [
+              {
+                "group": "Primeiros passos",
+                "pages": [
+                  "pt/introduction",
+                  "pt/installation",
+                  "pt/configuration"
+                ]
+              },
+              {
+                "group": "Conceitos centrais",
+                "pages": [
+                  "pt/concepts/architecture",
+                  "pt/concepts/services",
+                  "pt/concepts/credentials"
+                ]
+              },
+              {
+                "group": "Guias",
+                "pages": [
+                  "pt/guides/quickstart",
+                  "pt/guides/creating-preferences",
+                  "pt/guides/processing-payments",
+                  "pt/guides/handling-webhooks",
+                  "pt/guides/managing-customers",
+                  "pt/guides/refunds",
+                  "pt/guides/testing"
+                ]
+              },
+              {
+                "group": "Deploy",
+                "pages": [
+                  "pt/deployment/production",
+                  "pt/deployment/security"
+                ]
+              },
+              {
+                "group": "Troubleshooting",
+                "pages": [
+                  "pt/troubleshooting/common-issues",
+                  "pt/troubleshooting/debugging"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "Referência API",
+            "groups": [
+              {
+                "group": "Serviços",
+                "pages": [
+                  "pt/api/preference-service",
+                  "pt/api/payment-service",
+                  "pt/api/customer-service",
+                  "pt/api/card-service",
+                  "pt/api/refund-service",
+                  "pt/api/payment-method-service",
+                  "pt/api/webhook-service",
+                  "pt/api/test-user-service"
+                ]
+              },
+              {
+                "group": "Endpoints demo",
+                "pages": [
+                  "pt/api/endpoints/preferences",
+                  "pt/api/endpoints/payments",
+                  "pt/api/endpoints/customers",
+                  "pt/api/endpoints/webhooks",
+                  "pt/api/endpoints/payment-methods",
+                  "pt/api/endpoints/test-users"
+                ]
+              },
+              {
+                "group": "Configuração",
+                "pages": [
+                  "pt/api/configuration"
                 ]
               }
             ]

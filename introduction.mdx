@@ -1,149 +1,97 @@
 ---
 title: Introduction
-description: Laravel MercadoPago is a reusable package for integrating Mercado Pago into Laravel 12 projects with decoupled services and JSON API endpoints.
+description: Learn what the Laravel MercadoPago package includes, what it does not include, and how it fits into a Laravel application.
 ---
 
 ## Overview
 
-Laravel MercadoPago is a comprehensive integration package that simplifies working with Mercado Pago payment services in Laravel applications. Built with modern PHP practices and Laravel's service container architecture, it provides a clean, testable interface to the Mercado Pago SDK.
+Laravel MercadoPago is a reusable package for Laravel 12 projects that need a clean integration layer for Mercado Pago.
 
-## What It Solves
+It registers:
 
-This package handles the complexity of Mercado Pago integration by:
+- `LaravelMercadoPagoServiceProvider` through Laravel auto-discovery
+- `config/mercadopago.php`
+- singleton services for Mercado Pago operations
+- JSON demo endpoints under a configurable prefix
+- an always-on webhook endpoint
 
-- **Credential Management** - Resolves credentials from configuration and environment variables automatically
-- **SDK Configuration** - Configures the Mercado Pago SDK with access tokens and runtime environment settings
-- **Service Layer** - Provides injectable services for all major Mercado Pago operations
-- **Webhook Security** - Registers a webhook endpoint with HMAC signature validation when a secret is configured
-- **Development Support** - Exposes demo routes for local testing and development
+## What the package solves
 
-<Note>
-  The package focuses on encapsulating communication with the Mercado Pago SDK
-  and exposing a reusable API foundation. It does **not** include migrations,
-  Blade views, frontend components, payment persistence, or pre-configured
-  queues.
-</Note>
+- Resolves credentials from configuration through `CredentialResolverInterface`
+- Configures the Mercado Pago SDK access token and runtime environment
+- Wraps SDK clients in injectable Laravel services
+- Normalizes service responses into consistent JSON envelopes for demo endpoints
+- Validates webhook signatures when `MERCADOPAGO_WEBHOOK_SECRET` is configured
 
-## Key Features
+## Included services
 
-### Comprehensive Service Coverage
+| Service | Purpose |
+| --- | --- |
+| `PreferenceService` | Create checkout preferences |
+| `PaymentService` | Create and fetch payments |
+| `RefundService` | Process full and partial refunds |
+| `CustomerService` | Create and fetch customers |
+| `CardService` | Add and delete customer cards |
+| `PaymentMethodService` | List available payment methods |
+| `WebhookService` | Handle webhook payloads and signature checks |
+| `TestUserService` | Create Mercado Pago test users |
 
-The package includes dedicated services for all major Mercado Pago operations:
+## What the package does not include
 
-- **PreferenceService** - Create and manage payment preferences for Checkout Pro
-- **PaymentService** - Process and query payments
-- **RefundService** - Handle full and partial refunds
-- **CustomerService** - Manage customer records
-- **CardService** - Store and manage customer cards
-- **PaymentMethodService** - Query available payment methods
-- **TestUserService** - Generate test users for QA environments
-- **WebhookService** - Receive and validate Mercado Pago notifications
+- Database migrations
+- Checkout UI components
+- Payment persistence in your app database
+- Authentication or authorization for your own business endpoints
+- Queue workers, retries, or webhook storage
 
-### Auto-Discovery Support
-
-The package leverages Laravel's package auto-discovery feature, automatically registering:
-
-```php
-Fitodac\LaravelMercadoPago\LaravelMercadoPagoServiceProvider::class
-```
-
-No manual service provider registration required.
-
-### Flexible Route Configuration
-
-- **Always Active**: Production webhook endpoint at `/api/mercadopago/webhooks`
-- **Demo Routes**: Development and testing endpoints (enabled only in `local` and `testing` environments)
-- **Customizable Prefix**: Configure route prefixes via environment variables
-
-### Security First
-
-- HMAC signature validation for webhook authenticity
-- Environment-based credential resolution
-- Demo route protection (disabled in production)
-- Configurable runtime environments
+<Warning>
+  Demo endpoints are support tooling. For production flows, inject the services
+  into your own controllers, jobs, or actions and apply your own auth,
+  validation, and persistence rules.
+</Warning>
 
 ## Requirements
 
-<Steps>
-  <Step title="PHP 8.2 or higher">
-    The package requires PHP `^8.2` with strict type declarations.
-  </Step>
+- PHP `^8.2`
+- Laravel components `^12.0`
+- `mercadopago/dx-php ^3.8`
 
-  <Step title="Laravel 12">
-    Compatible with Laravel 12 framework components: - `illuminate/contracts
-    ^12.0` - `illuminate/http ^12.0` - `illuminate/routing ^12.0` -
-    `illuminate/support ^12.0`
-  </Step>
+## Response envelope
 
-  <Step title="Mercado Pago SDK">
-    Includes the official Mercado Pago PHP SDK `mercadopago/dx-php ^3.8`
-  </Step>
-</Steps>
+The package demo controllers return JSON in this shape:
 
-## What's NOT Included
-
-To maintain focus and flexibility, this package intentionally excludes:
-
-- **Database migrations** - Payment persistence logic belongs in your application
-- **Blade views** - Frontend integration is project-specific
-- **UI components** - JavaScript widgets and checkout forms are implemented separately
-- **Job queues** - Queue configuration depends on your architecture
-- **Business logic** - Authentication, authorization, and domain rules stay in your app
-
-<Warning>
-  The demo routes are support tools, not a complete business layer. For
-  production use, inject the services into your own controllers with proper
-  authentication and authorization.
-</Warning>
-
-## Architecture Philosophy
-
-Laravel MercadoPago follows a **service-oriented architecture**:
-
-1. **Services encapsulate SDK calls** - Each service wraps specific Mercado Pago API functionality
-2. **Dependency injection ready** - All services are registered as singletons in the container
-3. **Controller-agnostic** - Use the services in controllers, actions, jobs, or commands
-4. **Testable** - Services can be mocked and tested independently
-
-### Recommended Implementation Pattern
-
-```php
-use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-use Illuminate\Http\Request;
-
-class CheckoutController
+```json
 {
-    public function __construct(
-        private PreferenceService $preferenceService
-    ) {}
-
-    public function createPreference(Request $request)
-    {
-        $validated = $request->validate([
-            'items' => 'required|array',
-            'items.*.title' => 'required|string',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
-        ]);
-
-        $preference = $this->preferenceService->create($validated);
-
-        return response()->json([
-            'id' => $preference['id'],
-            'init_point' => $preference['init_point'],
-        ]);
-    }
+  "ok": true,
+  "data": {},
+  "meta": []
 }
 ```
 
-## Next Steps
+Failures return:
+
+```json
+{
+  "ok": false,
+  "message": "Mercado Pago access token is not configured."
+}
+```
+
+`MPApiException` responses may also include a `details` field with SDK response content.
+
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Installation" icon="download" href="/installation">
-    Install the package via Composer and configure auto-discovery
+    Install the package and confirm its routes are available.
   </Card>
-
   <Card title="Configuration" icon="gear" href="/configuration">
-    Set up environment variables and publish configuration files
+    Configure credentials, route prefix, and runtime behavior.
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
+    See how the service provider, middleware, controllers, and services fit together.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/guides/quickstart">
+    Run the shortest end-to-end setup for local development.
   </Card>
 </CardGroup>

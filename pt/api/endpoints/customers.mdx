@@ -1,0 +1,31 @@
+---
+title: Endpoint de customers
+description: Referência de endpoints demo para customers e customer cards.
+---
+
+## Disponibilidade
+
+Estes endpoints só respondem quando as demo routes estão habilitadas e o ambiente da app é `local` ou `testing`.
+
+## Rotas
+
+```text
+POST /api/mercadopago/customers
+GET /api/mercadopago/customers/{customerId}
+POST /api/mercadopago/customers/{customerId}/cards
+DELETE /api/mercadopago/customers/{customerId}/cards/{cardId}
+```
+
+## Campo obrigatório para create customer
+
+- `email`
+
+## Campo obrigatório para create card
+
+- `token`
+
+## Páginas relacionadas
+
+- [CustomerService](/pt/api/customer-service)
+- [CardService](/pt/api/card-service)
+- [Gerenciar customers](/pt/guides/managing-customers)

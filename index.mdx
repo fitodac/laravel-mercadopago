@@ -1,148 +1,53 @@
 ---
-title: "Laravel MercadoPago"
-description: "Implement Mercado Pago rapidly on any Laravel project"
+title: "Laravel MercadoPago docs"
+description: "Multilingual documentation for the Laravel MercadoPago package."
 ---
 
 # Laravel MercadoPago
 
-A Laravel package for integrating Mercado Pago payment gateway with reusable services and demo endpoints.
+Documentation for the reusable Laravel package at [fitodac/laravel-mercadopago](https://github.com/fitodac/laravel-mercadopago).
 
-## Overview
+The package provides:
 
-Laravel MercadoPago provides a clean, decoupled integration with the Mercado Pago payment platform. Built for Laravel 12, this package leverages auto-discovery and dependency injection to make payment processing straightforward and maintainable.
+- Laravel auto-discovery for `LaravelMercadoPagoServiceProvider`
+- Reusable services for preferences, payments, customers, cards, refunds, webhooks, payment methods, and test users
+- A configurable JSON demo API for `local` and `testing`
+- An always-on webhook endpoint with optional HMAC validation
+
+## Choose your language
+
+<CardGroup cols={3}>
+  <Card title="English" icon="languages" href="/introduction">
+    Read the canonical documentation set in English.
+  </Card>
+  <Card title="Español" icon="languages" href="/es/introduction">
+    Leé la documentación completa en español.
+  </Card>
+  <Card title="Português (Brasil)" icon="languages" href="/pt/introduction">
+    Leia a documentação completa em português do Brasil.
+  </Card>
+</CardGroup>
+
+## Start here
 
 <CardGroup cols={2}>
-  <Card title="Quick Start" icon="rocket" href="/guides/quickstart">
-    Get up and running with your first payment in minutes
-  </Card>
   <Card title="Installation" icon="download" href="/installation">
-    Install and configure the package in your Laravel project
-  </Card>
-  <Card title="API Reference" icon="code" href="/api/preference-service">
-    Explore all available services and methods
+    Install the package in a Laravel project and confirm route registration.
   </Card>
   <Card title="Configuration" icon="gear" href="/configuration">
-    Configure credentials and environment settings
+    Configure credentials, route prefix, demo routes, and runtime behavior.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/guides/quickstart">
+    Create your first preference and verify the health endpoint.
+  </Card>
+  <Card title="API reference" icon="code" href="/api/preference-service">
+    Explore the service layer and demo endpoints exposed by the package.
   </Card>
 </CardGroup>
 
-## Key Features
+## Package scope
 
-<CardGroup cols={2}>
-  <Card title="Auto-Discovery" icon="wand-magic-sparkles">
-    Automatic Laravel service provider registration
-  </Card>
-  <Card title="Reusable Services" icon="boxes-stacked">
-    Dedicated services for preferences, payments, refunds, customers, and cards
-  </Card>
-  <Card title="Webhook Validation" icon="shield-check">
-    HMAC signature validation for secure webhook handling
-  </Card>
-  <Card title="Demo Endpoints" icon="flask">
-    JSON endpoints for development and testing
-  </Card>
-  <Card title="Environment Config" icon="file-code">
-    Flexible configuration via environment variables
-  </Card>
-  <Card title="Test Users" icon="vial">
-    Test user creation for QA automation
-  </Card>
-</CardGroup>
-
-## What's Included
-
-This package provides:
-
-- **PreferenceService** - Create payment preferences for checkout flows
-- **PaymentService** - Process and retrieve payment information
-- **CustomerService** - Manage customer records
-- **CardService** - Handle customer payment cards
-- **RefundService** - Process full and partial refunds
-- **PaymentMethodService** - List available payment methods
-- **WebhookService** - Handle and validate Mercado Pago webhooks
-- **TestUserService** - Create test users for development
-
-## Requirements
-
-- PHP `^8.2`
-- Laravel `^12.0`
-- Mercado Pago SDK `^3.8`
-
-## Quick Example
-
-```php
-use Fitodac\LaravelMercadoPago\Services\PreferenceService;
-
-class CheckoutController
-{
-    public function createPreference(PreferenceService $preferenceService)
-    {
-        $preference = $preferenceService->create([
-            'items' => [
-                [
-                    'title' => 'Product Name',
-                    'quantity' => 1,
-                    'unit_price' => 100.00
-                ]
-            ],
-            'payer' => [
-                'email' => 'customer@example.com'
-            ]
-        ]);
-
-        return response()->json([
-            'id' => $preference['id'],
-            'init_point' => $preference['init_point']
-        ]);
-    }
-}
-```
-
-## Getting Started
-
-<Steps>
-  <Step title="Install the package">
-    Install via Composer in your Laravel project ```bash composer require
-    fitodac/laravel-mercadopago:^1.0 ```
-  </Step>
-
-  <Step title="Configure credentials">
-    Add your Mercado Pago credentials to `.env` ```ini
-    MERCADOPAGO_ACCESS_TOKEN=your_access_token
-    MERCADOPAGO_PUBLIC_KEY=your_public_key
-    MERCADOPAGO_WEBHOOK_SECRET=your_webhook_secret ```
-  </Step>
-
-  <Step title="Start building">
-    Inject services into your controllers and start processing payments
-  </Step>
-</Steps>
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card
-    title="Create Preferences"
-    icon="file-invoice"
-    href="/guides/creating-preferences"
-  >
-    Learn how to create payment preferences
-  </Card>
-  <Card
-    title="Process Payments"
-    icon="credit-card"
-    href="/guides/processing-payments"
-  >
-    Handle direct payment processing
-  </Card>
-  <Card title="Handle Webhooks" icon="webhook" href="/guides/handling-webhooks">
-    Implement webhook notifications
-  </Card>
-  <Card
-    title="Production Deployment"
-    icon="server"
-    href="/deployment/production"
-  >
-    Deploy securely to production
-  </Card>
-</CardGroup>
+<Note>
+  These docs describe the reusable package only. They do not document the host
+  Laravel app that may consume the package.
+</Note>

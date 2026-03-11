@@ -1,0 +1,53 @@
+---
+title: Refunds
+description: Processe full refunds ou partial refunds com RefundService e com o endpoint de refund de payments.
+---
+
+## Comportamento do refund
+
+`RefundService` suporta dois modos:
+
+- full refund quando `amount` é omitido
+- partial refund quando `amount` é enviado
+
+## Full refund
+
+```php
+$refund = $refundService->create($paymentId);
+```
+
+## Partial refund
+
+```php
+$refund = $refundService->create($paymentId, [
+    'amount' => 25.00,
+]);
+```
+
+## Endpoint demo
+
+```text
+POST /api/mercadopago/payments/{paymentId}/refunds
+```
+
+Payload:
+
+```json
+{
+  "amount": 25.00
+}
+```
+
+## Validações de negócio recomendadas
+
+Antes de chamar `RefundService`, verifique na sua app:
+
+- se a order pertence à conta correta
+- se o payment é elegível para refund
+- se o valor não excede o saldo reembolsável
+
+## Páginas relacionadas
+
+- [RefundService](/pt/api/refund-service)
+- [Endpoint de payments](/pt/api/endpoints/payments)
+- [Processar payments](/pt/guides/processing-payments)

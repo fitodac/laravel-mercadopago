@@ -1,112 +1,63 @@
 ---
-title: "Procesando Pagos en Transparente"
-description: "Atrapá pagos crudos directamente a la API utilizando Tarjetas Tokenizadas."
-icon: "credit-card"
+title: Procesar payments
+description: Creá direct card payments con PaymentService y entendé los campos obligatorios del payload.
 ---
 
-A diferencia de las **Preferencias**, que redirigen obligatoriamente a los clientes al entorno gráfico nativo y web de Mercado Pago para procesar, el procesamiento transparente mantiene las ventanas y modalidades contenidas herméticamente bajo el dominio y maquetado de nuestra App Laravel.
+## Input soportado
 
-## Flujo integral simplificado
+`CreatePaymentRequest` requiere:
 
-<Steps>
-  <Step title="Tokenizar la data privada y física de las tarjetas">
-    Integrá el MercadoPago SDK V2 oficial de front-end (JavaScript). Permite que el comprador ingrese todos sus PAN (números de tarjeta) y CVV y mediante una llamada directa y sin escalas se encripte y nos devuelva un simple Token efímero y anónimo.
-  </Step>
+- `transaction_amount`
+- `token`
+- `description`
+- `installments`
+- `payment_method_id`
+- `payer.email`
 
-  <Step title="Despacho general al Backend">
-    Hacé un fetch mediante axios/fetch con tu Token e información miscelánea hacia tus rutas locales de Laravel.
-  </Step>
+Campos opcionales:
 
-  <Step title="Fallo u Acreditación Central">
-    Usá el inyector fundamental `PaymentService` y devolvé con naturalidad asíncrona la resolución al DOM del usuario en pantalla.
-  </Step>
-</Steps>
+- `issuer_id`
+- `payer.identification`
+- `metadata`
+- `external_reference`
+- `notification_url`
 
-## Realizando transacciones
+## Ejemplo con service
 
-<CodeGroup>
-```php Mediante inyección de PaymentService
-<?php
-
+```php
 use Fitodac\LaravelMercadoPago\Services\PaymentService;
 
-final class GeneradorCobrosTransparentes
-{
-    public function procesarPagoFinal(Request $request, PaymentService $paymentService)
-    {
-        $payload = $request->validate([
-            'transaction_amount' => ['required', 'numeric', 'min:0.01'],
-            'token' => ['required', 'string'],
-            'description' => ['required', 'string'],
-            'installments' => ['required', 'integer', 'min:1'],
-            'payment_method_id' => ['required', 'string'],
-            'payer.email' => ['required', 'email'],
-        ]);
-
-        $payment = $paymentService->create($payload);
-
-        return response()->json($payment, 201);
-    }
-}
+$payment = $paymentService->create([
+    'transaction_amount' => 150.75,
+    'token' => 'card-token',
+    'description' => 'Order #1001',
+    'installments' => 1,
+    'payment_method_id' => 'visa',
+    'payer' => [
+        'email' => 'buyer@example.com',
+    ],
+    'external_reference' => 'order-1001',
+]);
 ```
 
-```bash Demo
-curl --request POST \
-  --url http://localhost:8000/api/mercadopago/payments \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "transaction_amount": 100.50,
-    "token": "CARD_TOKEN_FRONTEND_VENCIBLE",
-    "description": "Pago final sin redirect",
-    "installments": 1,
-    "payment_method_id": "visa",
-    "payer": {
-      "email": "comprador@ejemplo.com"
-    }
-  }'
-```
-</CodeGroup>
+## Endpoints demo
 
-### ¿Qué se enviará mediante el Payment? (Payload final)
-
-```json
-{
-  "transaction_amount": 25000.0,
-  "token": "JS_TOKEN",
-  "description": "Zapatillas Nike Premium",
-  "installments": 3,
-  "payment_method_id": "visa",
-  "issuer_id": 310,
-  "payer": {
-    "email": "comprador@hotmail.com",
-    "identification": {
-      "type": "DNI",
-      "number": "12345678"
-    }
-  },
-  "external_reference": "MI-LOCAL-1052",
-  "notification_url": "https://mi-dominio.com/api/mercadopago/webhooks"
-}
+```text
+POST /api/mercadopago/payments
+GET /api/mercadopago/payments/{paymentId}
+POST /api/mercadopago/payments/{paymentId}/refunds
 ```
 
-## Estados de los pagos (`status` y `status_detail`)
+## Flujo recomendado en producción
 
-Al concretarse, la API de Mercado Pago responde con las combinatorias entre de "Status Global" y "Sentencias Analíticas / Detailed".
+1. tokenizá los datos de la tarjeta en el frontend con herramientas de Mercado Pago
+2. enviá a tu backend solo el token y campos seguros de negocio
+3. creá el payment con `PaymentService`
+4. persistí tu propio estado de order
+5. confirmá el estado final del payment mediante webhooks
 
-| Estado (`status`) | Lo que significa históricamente             |
-| -------------- | ------------------------------------------- |
-| `approved`     | 🟢 Dinero extraído con éxito y depositado               |
-| `pending`      | ⏳ Evaluando / En pre-aprobación del banco / Boletas efectivo manuales|
-| `in_process`   | 🔄 Bajo lupa antifraudes interna                   |
-| `rejected`     | 🔴 Denegado irreversible                     |
-| `cancelled`    | 🚫 Cancelado a mano o se sobrepasó la fecha ventana                  |
+## Páginas relacionadas
 
-### Entendiendo la sentencia a fondo (Rechazos)
-
-Si el `status` figura en `rejected`, `status_detail` esclarecerá la variable que colapsó a la tarjeta:
-
-- `cc_rejected_bad_filled_card_number` - Tipearon mal sus 16 dígitos.
-- `cc_rejected_bad_filled_date` - Mes y año inválidos.
-- `cc_rejected_bad_filled_security_code` - Invlue CVC/CVV.
-- `cc_rejected_insufficient_amount` - Límite rebotado, saldo negativo, el plástico no cuenta con la suficiente liquidez monetaria para cubrir sus gastos propuestos.
-- `cc_rejected_high_risk` - Frenado automáticamente en la aduana de Prevención de Fraudes de MP Machine Learning.
+- [PaymentService](/es/api/payment-service)
+- [Endpoint de payments](/es/api/endpoints/payments)
+- [Refunds](/es/guides/refunds)

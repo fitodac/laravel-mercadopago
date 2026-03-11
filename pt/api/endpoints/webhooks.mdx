@@ -1,0 +1,52 @@
+---
+title: Endpoint de webhooks
+description: Referência do endpoint sempre ativo para notificações webhook do Mercado Pago.
+---
+
+## Disponibilidade
+
+Este endpoint permanece ativo em todos os ambientes.
+
+## Rota
+
+```text
+POST /api/mercadopago/webhooks
+```
+
+## Dados aceitos
+
+- `type`
+- `action`
+- `api_version`
+- `data.id`
+- `live_mode`
+- `user_id`
+- query string `topic`
+
+## Validação de assinatura
+
+Quando `MERCADOPAGO_WEBHOOK_SECRET` está configurado e existe `x-signature`, o pacote valida:
+
+- `x-signature`
+- `x-request-id`
+- `data.id`
+
+## Resposta de sucesso
+
+```json
+{
+  "ok": true,
+  "data": {
+    "acknowledged": true,
+    "validated": true,
+    "topic": "payment",
+    "resource": "1234567890"
+  },
+  "meta": []
+}
+```
+
+## Páginas relacionadas
+
+- [WebhookService](/pt/api/webhook-service)
+- [Lidar com webhooks](/pt/guides/handling-webhooks)

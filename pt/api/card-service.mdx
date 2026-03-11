@@ -1,0 +1,30 @@
+---
+title: CardService
+description: Referência API para adicionar e remover customer cards com CardService.
+---
+
+## Métodos
+
+```php
+create(string $customerId, array $payload): mixed
+delete(string $customerId, string $cardId): mixed
+```
+
+## Payload obrigatório
+
+- `token`
+
+## Exemplo
+
+```php
+$card = $cardService->create('123456', [
+    'token' => 'card-token',
+]);
+
+$result = $cardService->delete('123456', '987654');
+```
+
+## Páginas relacionadas
+
+- [Gerenciar customers](/pt/guides/managing-customers)
+- [Endpoint de customers](/pt/api/endpoints/customers)

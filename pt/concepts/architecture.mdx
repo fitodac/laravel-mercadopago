@@ -1,0 +1,102 @@
+---
+title: Arquitetura
+description: Veja como service provider, middleware, controllers, services e a configuração do SDK se conectam no Laravel MercadoPago.
+---
+
+## Blocos do pacote
+
+O pacote se apoia em quatro camadas:
+
+1. `LaravelMercadoPagoServiceProvider`
+2. camada HTTP para endpoints demo
+3. services que encapsulam clientes do SDK do Mercado Pago
+4. classes de suporte para credenciais, configuração do SDK e normalização de respostas
+
+## Responsabilidades do service provider
+
+`LaravelMercadoPagoServiceProvider` faz três coisas:
+
+- faz merge de `config/mercadopago.php`
+- faz bind de `CredentialResolverInterface`
+- registra singleton services e rotas
+
+Singletons registrados:
+
+- `MercadoPagoClientFactory`
+- `SdkHttpClient`
+- `PreferenceService`
+- `PaymentService`
+- `RefundService`
+- `CustomerService`
+- `CardService`
+- `PaymentMethodService`
+- `WebhookService`
+- `TestUserService`
+
+## Modelo de rotas
+
+O pacote carrega rotas de `routes/api.php` sob:
+
+```php
+Route::prefix((string) config('mercadopago.route_prefix', 'api/mercadopago'))
+    ->name('mercadopago.')
+```
+
+As rotas são divididas em dois grupos:
+
+- rota de webhook: sempre disponível
+- demo routes: protegidas por `mercadopago.demo`
+
+## Gate das demo routes
+
+`EnsureDemoRoutesEnabled` aborta com `404` a menos que:
+
+- `mercadopago.enable_demo_routes` seja `true`
+- o ambiente da aplicação seja `local` ou `testing`
+
+Isso mantém as ferramentas demo fora do tráfego de produção, mesmo com as rotas registradas.
+
+## Fluxo da request
+
+Fluxo típico de um demo endpoint:
+
+1. um `FormRequest` valida o payload recebido
+2. um controller chama um service do pacote
+3. o service usa `MercadoPagoClientFactory`
+4. o factory resolve credenciais e configura o SDK
+5. `AbstractApiController` encapsula a resposta como `{ ok, data, meta }`
+
+## Mapeamento de erros
+
+`AbstractApiController` converte exceções em respostas HTTP:
+
+| Tipo de exceção | Status |
+| --- | --- |
+| `MPApiException` | status code do SDK |
+| `MercadoPagoConfigurationException` | `422` |
+| `InvalidWebhookSignatureException` | `401` |
+| `HttpExceptionInterface` | status code do framework |
+| Qualquer outra exceção | `500` |
+
+## Resolução do runtime environment
+
+`MercadoPagoClientFactory` define o runtime do SDK com base em:
+
+- `MERCADOPAGO_RUNTIME_ENVIRONMENT` quando existir
+- senão `local` para `local/testing`
+- senão `server`
+
+## Caminho do webhook
+
+`WebhookService` processa requests de webhook desta forma:
+
+- lê o payload
+- resolve `webhookSecret`
+- valida `x-signature` quando existe um secret configurado
+- retorna `acknowledged`, `validated`, `topic`, `resource` e `payload`
+
+## Páginas relacionadas
+
+- [Services](/pt/concepts/services)
+- [Credenciais](/pt/concepts/credentials)
+- [Endpoint de webhook](/pt/api/endpoints/webhooks)

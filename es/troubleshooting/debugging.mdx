@@ -1,91 +1,77 @@
 ---
-title: Debugging (Depuración)
-description: Técnicas y herramientas recomendadas para diagnosticar anomalías en tu instalación de Laravel MercadoPago
+title: Debugging
+description: Usá inspección de rutas, revisión de config y smoke tests pequeños para depurar integraciones con Laravel MercadoPago.
 ---
 
-## Health Check Endpoint
+## Empezá por las rutas
 
-El paquete trae incrustado una ruta que diagnostica los parámetros operativos vitales internamente.
+```bash
+php artisan route:list --name=mercadopago
+```
 
-<Note>
-  El test de Health (Salud mental del paquete) sólo existe mientras tus Rutas Demo se mantengan en pie, por ende se vuelve inaccesible desde Entornos de Producción.
-</Note>
+Revisá que:
+
+- el prefijo coincida con `MERCADOPAGO_ROUTE_PREFIX`
+- exista la ruta de webhook
+- estén presentes los nombres de demo routes
+
+## Revisá la configuración efectiva
+
+Inspeccioná el entorno y la config publicada:
+
+```bash
+php artisan config:clear
+php artisan tinker
+```
+
+Dentro de Tinker:
+
+```php
+config('mercadopago')
+```
+
+## Usá el health endpoint
+
+En `local` o `testing`:
 
 ```bash
 curl http://localhost:8000/api/mercadopago/health
 ```
 
-**Respuesta óptima alcanzada:**
+Eso confirma:
 
-```json
-{
-  "ok": true,
-  "data": {
-    "configured": true,
-    "has_public_key": true,
-    "has_webhook_secret": true,
-    "environment": "local"
-  },
-  "meta": []
-}
-```
+- resolución del access token
+- si existe `publicKey`
+- si existe `webhookSecret`
+- entorno Laravel actual
 
-## Inspección de Rutas
+## Depurar firmas de webhook
 
-Verificá el comportamiento de Artisan para detectar colisiones en el montado automático.
+Si falla la validación del webhook:
 
-```bash
-php artisan route:list --name=mercadopago --columns=method,uri,name,middleware
-```
+- registrá el `x-signature` entrante
+- registrá el `x-request-id` entrante
+- confirmá que el payload incluya `data.id`
+- confirmá que el secret coincida con Mercado Pago
 
-Si tus rutas se encuentran listadas, la conexión núcleo a nivel Framework ha tomado control con éxito total. En el output debés constatar que aquellas que actúen con Middleware digan explícitamente `mercadopago.demo`.
+## Depurar uso de services en tu app
 
-## Análisis y Manejo de Logs
-
-### Exponer información durante los Webhooks
-
-Para desmitificar qué trae el Webhook podés inyectar rápidamente interrupciones de debugeo que queden grabados el canal estándar general:
+Cuando falle tu propio controller, probá el service de forma aislada:
 
 ```php
-Route::post('/custom-webhook', function (Request $request, WebhookService $service) {
-    Log::channel('daily')->info('Tramando Webhook Recibido', [
-        'cabeceras' => $request->headers->all(),
-        'cuerpo_json' => $request->all()
-    ]);
-
-    try {
-        $data = $service->handle($request);
-        Log::channel('daily')->info('Exito en procesamiento seguro: ', $data);
-        return $data;
-    } catch (\Exception $e) {
-        Log::channel('daily')->error('Ruptura de firmas', ['trazo' => $e->getTraceAsString()]);
-        throw $e;
-    }
-});
+app(\Fitodac\LaravelMercadoPago\Services\PreferenceService::class)->create([
+    'items' => [
+        [
+            'title' => 'Debug item',
+            'quantity' => 1,
+            'unit_price' => 10,
+        ],
+    ],
+]);
 ```
 
-Luego bastará atar tu tail al archivo generado:
-```bash
-tail -f storage/logs/laravel-$(date +%Y-%m-%d).log
-```
+## Páginas relacionadas
 
-## Arquitectura de Errores a Controlar
-
-### 1. MercadoPagoConfigurationException
-Falla catastrófica por ausencia de configuración. Trae ramificaciones del estilo:
-- `missingAccessToken()`
-- `sdkNotInstalled()`
-
-Cierran devolviendo fatalmente en status 5xx.
-
-### 2. InvalidWebhookSignatureException
-Intentos de acceso forzados a webhooks de notificaciones sin el conocimiento previo de la llave privada HMAC configurada desde tu panel. Te advierte y desestima con un código `401 / Unauthorized`. Puede usarse si notas inundaciones desde IPs misteriosas que pretenden autoconfirmar facturaciones.
-
-## Depurando llamadas locales (Ngrok)
-
-Sigue siendo el método principal para conectar una App construida 100% en localhost y que no ve el exterior.
-
-1. Instalá y dispará: `ngrok http 8000`
-2. Copiá tu url remota asignada (`https://ab12sd.ngrok.app`)
-3. Pegá las notificaciones webhooks del dashboard Mercado Pago adjuntándoles tu prefijo (`/api/mercadopago/webhooks`).
-4. Entrá al portal inspector local `http://localhost:4040` y verificá a tiempo real sin logear cada campo que te envían en vivo.
+- [Problemas comunes](/es/troubleshooting/common-issues)
+- [Inicio rápido](/es/guides/quickstart)
+- [Configuración de API](/es/api/configuration)

@@ -1,0 +1,63 @@
+---
+title: Processar payments
+description: Crie direct card payments com PaymentService e entenda os campos obrigatórios do payload.
+---
+
+## Input suportado
+
+`CreatePaymentRequest` exige:
+
+- `transaction_amount`
+- `token`
+- `description`
+- `installments`
+- `payment_method_id`
+- `payer.email`
+
+Campos opcionais:
+
+- `issuer_id`
+- `payer.identification`
+- `metadata`
+- `external_reference`
+- `notification_url`
+
+## Exemplo com service
+
+```php
+use Fitodac\LaravelMercadoPago\Services\PaymentService;
+
+$payment = $paymentService->create([
+    'transaction_amount' => 150.75,
+    'token' => 'card-token',
+    'description' => 'Order #1001',
+    'installments' => 1,
+    'payment_method_id' => 'visa',
+    'payer' => [
+        'email' => 'buyer@example.com',
+    ],
+    'external_reference' => 'order-1001',
+]);
+```
+
+## Endpoints demo
+
+```text
+POST /api/mercadopago/payments
+GET /api/mercadopago/payments/{paymentId}
+POST /api/mercadopago/payments/{paymentId}/refunds
+```
+
+## Fluxo recomendado em produção
+
+1. tokenize os dados do cartão no frontend com ferramentas do Mercado Pago
+2. envie ao backend apenas o token e campos seguros de negócio
+3. crie o payment com `PaymentService`
+4. persista o seu próprio estado de order
+5. confirme o estado final do payment por meio de webhooks
+
+## Páginas relacionadas
+
+- [PaymentService](/pt/api/payment-service)
+- [Endpoint de payments](/pt/api/endpoints/payments)
+- [Refunds](/pt/guides/refunds)
